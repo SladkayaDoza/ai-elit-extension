@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "AI ELIT Solver",
+  "version": "1.2.2",
+  "description": "Automatically answers quiz questions using OpenRouter AI",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://openrouter.ai/*",
+    "<all_urls>"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://mix.sumdu.edu.ua/*",
+        "https://cabinet.sumdu.edu.ua/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "AI ELIT Solver"
+  }
+}

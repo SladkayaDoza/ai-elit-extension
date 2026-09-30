@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="uk">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI ELIT Solver</title>
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      width: 400px;
+      min-height: 600px;
+      background: #0d0d1a;
+      color: #e0e0e0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 13px;
+      padding: 16px;
+    }
+
+    /* ─── Header ─── */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+      border-bottom: 1px solid #1e2a3a;
+      padding-bottom: 12px;
+    }
+
+    .logo {
+      font-size: 22px;
+      line-height: 1;
+      color: #4ecca3;
+    }
+
+    .header-text h1 {
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: 0.03em;
+    }
+
+    .header-text p {
+      font-size: 11px;
+      color: #6b7a8d;
+      margin-top: 2px;
+    }
+
+    .header-right {
+      margin-left: auto;
+    }
+
+    .gear-btn {
+      background: none;
+      border: 1px solid #1e2a3a;
+      border-radius: 6px;
+      color: #6b8a9e;
+      font-size: 16px;
+      cursor: pointer;
+      padding: 5px 8px;
+      transition: all 0.2s;
+      line-height: 1;
+    }
+
+    .gear-btn:hover {
+      color: #4ecca3;
+      border-color: #4ecca3;
+      background: rgba(78, 204, 163, 0.06);
+    }
+
+    /* ─── Tabs ─── */
+    .tabs {
+      display: flex;
+      gap: 2px;
+      margin-bottom: 14px;
+      background: #111827;
+      border-radius: 8px;
+      padding: 3px;
+      border: 1px solid #1e2a3a;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 7px 0;
+      background: transparent;
+      border: none;
+      border-radius: 6px;
+      color: #6b7a8d;
+      font-size: 11px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s;
+      letter-spacing: 0.03em;
+    }
+
+    .tab-btn:hover {
+      color: #a0b0c0;
+    }
+
+    .tab-btn.active {
+      background: #1a2332;
+      color: #4ecca3;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* ─── Form fields ─── */
+    .field {
+      margin-bottom: 12px;
+    }
+
+    label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #6b8a9e;
+      margin-bottom: 5px;
+    }
+
+    input,
+    select {
+      width: 100%;
+      padding: 8px 10px;
+      background: #111827;
+      border: 1px solid #1e2a3a;
+      border-radius: 6px;
+      color: #e0e0e0;
+      font-size: 12px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input:focus,
+    select:focus {
+      border-color: #4ecca3;
+      box-shadow: 0 0 0 2px rgba(78, 204, 163, 0.12);
+    }
+
+    input[type="password"] {
+      letter-spacing: 0.1em;
+    }
+
+    select option {
+      background: #111827;
+    }
+
+    .toggle-key {
+      position: relative;
+    }
+
+    .toggle-key input {
+      padding-right: 36px;
+    }
+
+    .eye-btn {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #4ecca3;
+      font-size: 14px;
+      padding: 0;
+      line-height: 1;
+    }
+
+    .hint {
+      font-size: 10px;
+      color: #3d4f5f;
+      margin-top: 4px;
+      line-height: 1.5;
+    }
+
+    .hint a {
+      color: #4ecca3;
+      text-decoration: none;
+    }
+
+    .hint a:hover {
+      text-decoration: underline;
+    }
+
+    /* ─── Toggle switch ─── */
+    .toggle-field {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 10px;
+      margin-bottom: 6px;
+      padding: 9px 12px;
+      background: #111827;
+      border: 1px solid #1e2a3a;
+      border-radius: 6px;
+    }
+
+    .toggle-field label {
+      margin-bottom: 0;
+      font-size: 12px;
+      text-transform: none;
+      letter-spacing: 0;
+      color: #c0c8d4;
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 40px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      position: absolute;
+    }
+
+    .slider {
+      position: absolute;
+      inset: 0;
+      background: #1e2a3a;
+      border-radius: 22px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    .slider::before {
+      content: '';
+      position: absolute;
+      left: 3px;
+      top: 3px;
+      width: 16px;
+      height: 16px;
+      background: #6b7a8d;
+      border-radius: 50%;
+      transition: transform 0.3s, background 0.3s;
+    }
+
+    .toggle-switch input:checked+.slider {
+      background: #16302a;
+    }
+
+    .toggle-switch input:checked+.slider::before {
+      transform: translateX(18px);
+      background: #4ecca3;
+    }
+
+    .toggle-hint {
+      font-size: 10px;
+      color: #3d4f5f;
+      text-align: center;
+      margin-top: 2px;
+      line-height: 1.4;
+    }
+
+    /* ─── Buttons ─── */
+    .save-btn {
+      width: 100%;
+      padding: 9px;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #4ecca3;
+      border: 1px solid #4ecca3;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      margin-top: 4px;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+
+    .save-btn:hover {
+      background: #0f3460;
+      box-shadow: 0 0 16px rgba(78, 204, 163, 0.25);
+    }
+
+    .btn-sm {
+      padding: 6px 12px;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #4ecca3;
+      border: 1px solid #1e2a3a;
+      border-radius: 5px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+
+    .btn-sm:hover {
+      border-color: #4ecca3;
+      box-shadow: 0 0 8px rgba(78, 204, 163, 0.15);
+    }
+
+    .btn-sm.danger {
+      color: #ff6b6b;
+    }
+
+    .btn-sm.danger:hover {
+      border-color: #ff6b6b;
+      box-shadow: 0 0 8px rgba(255, 107, 107, 0.15);
+    }
+
+    .status {
+      text-align: center;
+      font-size: 12px;
+      margin-top: 8px;
+      min-height: 18px;
+      color: #4ecca3;
+      transition: opacity 0.3s;
+    }
+
+    .status.error {
+      color: #ff6b6b;
+    }
+
+    /* ─── Models Tab ─── */
+    .model-list {
+      max-height: 380px;
+      overflow-y: auto;
+      margin-bottom: 10px;
+    }
+
+    .model-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      background: #111827;
+      border: 1px solid #1e2a3a;
+      border-radius: 6px;
+      margin-bottom: 4px;
+      transition: border-color 0.2s;
+    }
+
+    .model-item:hover {
+      border-color: #2a3a4a;
+    }
+
+    .model-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .model-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: #e0e0e0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .model-id {
+      font-size: 10px;
+      color: #4a5a6a;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .badge {
+      font-size: 9px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      background: #1a2332;
+      color: #4ecca3;
+      border: 1px solid #2a3a4a;
+      flex-shrink: 0;
+    }
+
+    .delete-model-btn {
+      background: none;
+      border: none;
+      color: #4a5a6a;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 2px 4px;
+      line-height: 1;
+      transition: color 0.2s;
+      flex-shrink: 0;
+    }
+
+    .delete-model-btn:hover {
+      color: #ff6b6b;
+    }
+
+    .add-model-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .add-model-row input {
+      flex: 1;
+      min-width: 0;
+    }
+
+    /* ─── Profiles Tab ─── */
+    .profile-selector {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .profile-chip {
+      padding: 6px 14px;
+      background: #111827;
+      border: 1px solid #1e2a3a;
+      border-radius: 20px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: #a0b0c0;
+      font-family: inherit;
+    }
+
+    .profile-chip:hover {
+      border-color: #4ecca3;
+    }
+
+    .profile-chip.active {
+      background: #16302a;
+      border-color: #4ecca3;
+      color: #4ecca3;
+      font-weight: 600;
+    }
+
+    .profile-chip .chip-icon {
+      margin-right: 4px;
+    }
+
+    .profile-actions {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .assignment-card {
+      background: #111827;
+      border: 1px solid #1e2a3a;
+      border-radius: 6px;
+      padding: 10px;
+      margin-bottom: 6px;
+    }
+
+    .assignment-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #8a9ab0;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .assignment-label .a-icon {
+      font-size: 13px;
+    }
+
+    .assignment-row {
+      display: flex;
+      gap: 6px;
+    }
+
+    .assignment-row select {
+      padding: 6px 8px;
+      font-size: 11px;
+    }
+
+    .assignment-row .model-select {
+      flex: 2;
+      min-width: 0;
+    }
+
+    .assignment-row .reasoning-select {
+      flex: 1;
+      min-width: 80px;
+    }
+
+    /* ─── New profile form ─── */
+    .new-profile-form {
+      display: none;
+      margin-bottom: 10px;
+      padding: 10px;
+      background: #111827;
+      border: 1px solid #1e2a3a;
+      border-radius: 6px;
+    }
+
+    .new-profile-form.visible {
+      display: block;
+    }
+
+    .new-profile-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .new-profile-row input {
+      min-width: 0;
+    }
+
+    .icon-input {
+      width: 44px !important;
+      flex-shrink: 0;
+      text-align: center;
+      font-size: 16px !important;
+    }
+
+    /* ─── Modal ─── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-overlay.visible {
+      display: flex;
+    }
+
+    .modal {
+      background: #0d0d1a;
+      border: 1px solid #1e2a3a;
+      border-radius: 10px;
+      padding: 20px;
+      width: 340px;
+      max-width: 95%;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+    }
+
+    .modal h2 {
+      font-size: 14px;
+      color: #fff;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .modal-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .modal-btn {
+      width: 100%;
+      padding: 10px;
+      background: #111827;
+      border: 1px solid #1e2a3a;
+      border-radius: 6px;
+      color: #c0c8d4;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .modal-btn:hover {
+      border-color: #4ecca3;
+      color: #4ecca3;
+    }
+
+    .modal-btn .m-icon {
+      font-size: 16px;
+    }
+
+    .modal-close {
+      margin-top: 10px;
+      width: 100%;
+      padding: 8px;
+      background: transparent;
+      border: 1px solid #2a3a4a;
+      border-radius: 6px;
+      color: #6b7a8d;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+
+    .modal-close:hover {
+      color: #e0e0e0;
+      border-color: #4a5a6a;
+    }
+
+    .modal-version {
+      text-align: center;
+      font-size: 10px;
+      color: #3d4f5f;
+      margin-top: 10px;
+    }
+
+    /* ─── Scrollbar ─── */
+    ::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #2a3a4a;
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #3a4a5a;
+    }
+
+    /* hidden file input */
+    #importFileInput {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">✦</div>
+    <div class="header-text">
+      <h1>AI ELIT Solver</h1>
+      <p>Powered by OpenRouter</p>
+    </div>
+    <div class="header-right">
+      <button class="gear-btn" id="gearBtn" title="Settings">⚙</button>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="main">Main</button>
+    <button class="tab-btn" data-tab="models">Models</button>
+    <button class="tab-btn" data-tab="profiles">Profiles</button>
+  </div>
+
+  <!-- ══════════ TAB: Main ══════════ -->
+  <div class="tab-content active" id="tab-main">
+    <div class="field">
+      <label>OpenRouter API Key</label>
+      <div class="toggle-key">
+        <input type="password" id="apiKey" placeholder="sk-or-v1-…" autocomplete="off">
+        <button class="eye-btn" id="toggleKey" title="Show/Hide">👁</button>
+      </div>
+      <p class="hint">
+        Get a free key at <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a>
+      </p>
+    </div>
+
+    <div class="field">
+      <label>Active Profile</label>
+      <select id="activeProfile"></select>
+    </div>
+
+    <button class="save-btn" id="saveBtn">Save Settings</button>
+
+    <div class="toggle-field">
+      <label for="hideButton">Hide "Answer with AI" button</label>
+      <label class="toggle-switch">
+        <input type="checkbox" id="hideButton">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <p class="toggle-hint">Button hidden, but <b>\</b> hotkey still works</p>
+
+    <div class="toggle-field">
+      <label for="debugMode">Debug mode (log prompts to console)</label>
+      <label class="toggle-switch">
+        <input type="checkbox" id="debugMode">
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <!-- ══════════ TAB: Models ══════════ -->
+  <div class="tab-content" id="tab-models">
+    <div class="model-list" id="modelList"></div>
+
+    <div class="add-model-row">
+      <input type="text" id="newModelId" placeholder="provider/model-name">
+      <input type="text" id="newModelName" placeholder="Display name">
+      <button class="btn-sm" id="addModelBtn">+ Add</button>
+    </div>
+    <p class="hint" style="margin-top:6px">Enter an OpenRouter model ID and a display name</p>
+  </div>
+
+  <!-- ══════════ TAB: Profiles ══════════ -->
+  <div class="tab-content" id="tab-profiles">
+    <div class="profile-selector" id="profileSelector"></div>
+
+    <div class="profile-actions">
+      <button class="btn-sm" id="newProfileBtn">+ New Profile</button>
+      <button class="btn-sm danger" id="deleteProfileBtn">Delete</button>
+    </div>
+
+    <div class="new-profile-form" id="newProfileForm">
+      <label>Create New Profile</label>
+      <div class="new-profile-row">
+        <input type="text" class="icon-input" id="newProfileIcon" placeholder="⚡" maxlength="2">
+        <input type="text" id="newProfileName" placeholder="Profile name">
+        <button class="btn-sm" id="createProfileBtn">Create</button>
+      </div>
+    </div>
+
+    <div id="assignmentsContainer"></div>
+  </div>
+
+  <!-- Status -->
+  <div class="status" id="status"></div>
+
+  <!-- ══════════ Settings Modal ══════════ -->
+  <div class="modal-overlay" id="settingsModal">
+    <div class="modal">
+      <h2>⚙ Settings</h2>
+      <div class="modal-actions">
+        <button class="modal-btn" id="exportBtn">
+          <span class="m-icon">📤</span> Export Config
+        </button>
+        <button class="modal-btn" id="importBtn">
+          <span class="m-icon">📥</span> Import Config
+        </button>
+      </div>
+      <input type="file" id="importFileInput" accept=".json">
+      <button class="modal-close" id="closeModalBtn">Close</button>
+      <p class="modal-version">AI ELIT Solver v1.2.0</p>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+
+</html>
