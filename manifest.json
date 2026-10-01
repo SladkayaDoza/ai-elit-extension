@@ -10,7 +10,8 @@
   ],
   "host_permissions": [
     "https://openrouter.ai/*",
-    "<all_urls>"
+    "https://mix.sumdu.edu.ua/*",
+    "https://cabinet.sumdu.edu.ua/*"
   ],
   "content_scripts": [
     {
