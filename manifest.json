@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "AI ELIT Solver",
-  "version": "1.3.2",
-  "description": "Automatically answers quiz questions using OpenRouter AI",
+  "version": "1.4.4",
+  "description": "Automatically answers quiz questions using AI",
   "permissions": [
     "storage",
     "activeTab",

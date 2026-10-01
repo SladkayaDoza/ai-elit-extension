@@ -6,6 +6,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI ELIT Solver</title>
   <style>
+    :root {
+      --bg: #101012;
+      --surface: #161618;
+      --raised: #1c1c1f;
+      --border: #2a2a2e;
+      --border-soft: #232327;
+      --border-strong: #3c3c41;
+      --text: #f5f4f0;
+      --text-dim: #d3d0c9;
+      --text-faint: #a5a198;
+      --accent: #d7a35f;
+      --accent-soft: rgba(215, 163, 95, 0.12);
+      --error: #e07a7a;
+    }
+
     *,
     *::before,
     *::after {
@@ -16,11 +31,14 @@
 
     body {
       width: 400px;
-      min-height: 600px;
-      background: #0d0d1a;
-      color: #e0e0e0;
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      font-size: 13px;
+      min-height: 520px;
+      max-height: 600px;
+      overflow-y: auto;
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.55;
       padding: 16px;
     }
 
@@ -29,28 +47,28 @@
       display: flex;
       align-items: center;
       gap: 10px;
-      margin-bottom: 14px;
-      border-bottom: 1px solid #1e2a3a;
+      margin-bottom: 16px;
+      border-bottom: 1px dashed var(--border);
       padding-bottom: 12px;
     }
 
     .logo {
-      font-size: 22px;
+      font-size: 18px;
       line-height: 1;
-      color: #4ecca3;
+      color: var(--accent);
     }
 
     .header-text h1 {
-      font-size: 15px;
+      font-size: 13px;
       font-weight: 700;
-      color: #fff;
-      letter-spacing: 0.03em;
+      color: var(--text);
+      letter-spacing: 0.02em;
     }
 
     .header-text p {
-      font-size: 11px;
-      color: #6b7a8d;
-      margin-top: 2px;
+      font-size: 10px;
+      color: var(--text-faint);
+      margin-top: 1px;
     }
 
     .header-right {
@@ -59,56 +77,53 @@
 
     .gear-btn {
       background: none;
-      border: 1px solid #1e2a3a;
+      border: 1px dashed var(--border);
       border-radius: 6px;
-      color: #6b8a9e;
-      font-size: 16px;
+      color: var(--text-faint);
+      font-size: 14px;
       cursor: pointer;
-      padding: 5px 8px;
-      transition: all 0.2s;
+      padding: 5px 9px;
+      transition: color 0.15s, border-color 0.15s;
       line-height: 1;
+      font-family: inherit;
     }
 
     .gear-btn:hover {
-      color: #4ecca3;
-      border-color: #4ecca3;
-      background: rgba(78, 204, 163, 0.06);
+      color: var(--accent);
+      border-color: var(--accent);
     }
 
     /* ─── Tabs ─── */
     .tabs {
       display: flex;
-      gap: 2px;
-      margin-bottom: 14px;
-      background: #111827;
-      border-radius: 8px;
-      padding: 3px;
-      border: 1px solid #1e2a3a;
+      gap: 4px;
+      margin-bottom: 16px;
+      border-bottom: 1px dashed var(--border);
     }
 
     .tab-btn {
-      flex: 1;
-      padding: 7px 0;
+      padding: 7px 10px;
       background: transparent;
       border: none;
-      border-radius: 6px;
-      color: #6b7a8d;
+      border-bottom: 1px solid transparent;
+      margin-bottom: -1px;
+      color: var(--text-faint);
       font-size: 11px;
       font-weight: 600;
       font-family: inherit;
       cursor: pointer;
-      transition: all 0.2s;
-      letter-spacing: 0.03em;
+      transition: color 0.15s, border-color 0.15s;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
     }
 
     .tab-btn:hover {
-      color: #a0b0c0;
+      color: var(--text-dim);
     }
 
     .tab-btn.active {
-      background: #1a2332;
-      color: #4ecca3;
-      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+      color: var(--accent);
+      border-bottom: 1px solid var(--accent);
     }
 
     .tab-content {
@@ -121,37 +136,40 @@
 
     /* ─── Form fields ─── */
     .field {
-      margin-bottom: 12px;
+      margin-bottom: 14px;
     }
 
     label {
       display: block;
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.08em;
-      color: #6b8a9e;
+      color: var(--text-faint);
       margin-bottom: 5px;
     }
 
     input,
     select {
       width: 100%;
-      padding: 8px 10px;
-      background: #111827;
-      border: 1px solid #1e2a3a;
+      padding: 7px 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
       border-radius: 6px;
-      color: #e0e0e0;
+      color: var(--text);
       font-size: 12px;
       font-family: inherit;
       outline: none;
-      transition: border-color 0.2s;
+      transition: border-color 0.15s;
     }
 
     input:focus,
     select:focus {
-      border-color: #4ecca3;
-      box-shadow: 0 0 0 2px rgba(78, 204, 163, 0.12);
+      border-color: var(--accent);
+    }
+
+    input::placeholder {
+      color: #8f8b83;
     }
 
     input[type="password"] {
@@ -159,7 +177,8 @@
     }
 
     select option {
-      background: #111827;
+      background: var(--surface);
+      color: var(--text);
     }
 
     .toggle-key {
@@ -167,7 +186,7 @@
     }
 
     .toggle-key input {
-      padding-right: 36px;
+      padding-right: 34px;
     }
 
     .eye-btn {
@@ -178,26 +197,33 @@
       background: none;
       border: none;
       cursor: pointer;
-      color: #4ecca3;
-      font-size: 14px;
+      color: var(--text-faint);
+      font-size: 13px;
       padding: 0;
       line-height: 1;
+      transition: color 0.15s;
+    }
+
+    .eye-btn:hover {
+      color: var(--text);
     }
 
     .hint {
       font-size: 10px;
-      color: #3d4f5f;
-      margin-top: 4px;
+      color: var(--text-faint);
+      margin-top: 6px;
       line-height: 1.5;
     }
 
     .hint a {
-      color: #4ecca3;
+      color: var(--accent);
       text-decoration: none;
+      border-bottom: 1px dashed var(--accent);
     }
 
     .hint a:hover {
-      text-decoration: underline;
+      color: var(--text);
+      border-bottom-color: var(--text);
     }
 
     /* ─── Toggle switch ─── */
@@ -207,25 +233,25 @@
       justify-content: space-between;
       gap: 10px;
       margin-top: 10px;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
       padding: 9px 12px;
-      background: #111827;
-      border: 1px solid #1e2a3a;
-      border-radius: 6px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
     }
 
     .toggle-field label {
       margin-bottom: 0;
-      font-size: 12px;
+      font-size: 11px;
       text-transform: none;
       letter-spacing: 0;
-      color: #c0c8d4;
+      color: var(--text-dim);
     }
 
     .toggle-switch {
       position: relative;
-      width: 40px;
-      height: 22px;
+      width: 36px;
+      height: 20px;
       flex-shrink: 0;
     }
 
@@ -239,10 +265,10 @@
     .slider {
       position: absolute;
       inset: 0;
-      background: #1e2a3a;
-      border-radius: 22px;
+      background: var(--border);
+      border-radius: 20px;
       cursor: pointer;
-      transition: background 0.3s;
+      transition: background 0.2s;
     }
 
     .slider::before {
@@ -250,90 +276,97 @@
       position: absolute;
       left: 3px;
       top: 3px;
-      width: 16px;
-      height: 16px;
-      background: #6b7a8d;
+      width: 14px;
+      height: 14px;
+      background: var(--text-faint);
       border-radius: 50%;
-      transition: transform 0.3s, background 0.3s;
+      transition: transform 0.2s, background 0.2s;
     }
 
     .toggle-switch input:checked+.slider {
-      background: #16302a;
+      background: var(--accent-soft);
     }
 
     .toggle-switch input:checked+.slider::before {
-      transform: translateX(18px);
-      background: #4ecca3;
+      transform: translateX(16px);
+      background: var(--accent);
     }
 
     .toggle-hint {
       font-size: 10px;
-      color: #3d4f5f;
+      color: var(--text-faint);
       text-align: center;
       margin-top: 2px;
+      margin-bottom: 8px;
       line-height: 1.4;
     }
 
     /* ─── Buttons ─── */
     .save-btn {
       width: 100%;
-      padding: 9px;
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-      color: #4ecca3;
-      border: 1px solid #4ecca3;
+      padding: 8px;
+      background: var(--accent);
+      color: #17130d;
+      border: 1px solid var(--accent);
       border-radius: 6px;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 700;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.04em;
       cursor: pointer;
       margin-top: 4px;
-      transition: all 0.2s;
+      transition: filter 0.15s;
       font-family: inherit;
     }
 
     .save-btn:hover {
-      background: #0f3460;
-      box-shadow: 0 0 16px rgba(78, 204, 163, 0.25);
+      filter: brightness(1.1);
     }
 
     .btn-sm {
       padding: 6px 12px;
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-      color: #4ecca3;
-      border: 1px solid #1e2a3a;
-      border-radius: 5px;
+      background: transparent;
+      color: var(--text-dim);
+      border: 1px dashed var(--border-strong);
+      border-radius: 6px;
       font-size: 11px;
       font-weight: 600;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
       font-family: inherit;
     }
 
     .btn-sm:hover {
-      border-color: #4ecca3;
-      box-shadow: 0 0 8px rgba(78, 204, 163, 0.15);
+      color: var(--accent);
+      border-color: var(--accent);
+      background: var(--accent-soft);
     }
 
     .btn-sm.danger {
-      color: #ff6b6b;
+      color: var(--error);
     }
 
     .btn-sm.danger:hover {
-      border-color: #ff6b6b;
-      box-shadow: 0 0 8px rgba(255, 107, 107, 0.15);
+      border-color: var(--error);
+      background: rgba(224, 122, 122, 0.08);
     }
 
     .status {
       text-align: center;
-      font-size: 12px;
-      margin-top: 8px;
-      min-height: 18px;
-      color: #4ecca3;
+      font-size: 11px;
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px dashed var(--border-soft);
+      min-height: 26px;
+      color: var(--accent);
       transition: opacity 0.3s;
     }
 
+    .status:empty {
+      border-top-color: transparent;
+    }
+
     .status.error {
-      color: #ff6b6b;
+      color: var(--error);
     }
 
     /* ─── Models Tab ─── */
@@ -347,16 +380,16 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 8px 10px;
-      background: #111827;
-      border: 1px solid #1e2a3a;
+      padding: 7px 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
       border-radius: 6px;
       margin-bottom: 4px;
-      transition: border-color 0.2s;
+      transition: border-color 0.15s;
     }
 
     .model-item:hover {
-      border-color: #2a3a4a;
+      border-color: var(--border-strong);
     }
 
     .model-info {
@@ -365,9 +398,9 @@
     }
 
     .model-name {
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 600;
-      color: #e0e0e0;
+      color: var(--text);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -375,7 +408,7 @@
 
     .model-id {
       font-size: 10px;
-      color: #4a5a6a;
+      color: var(--text-faint);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -383,28 +416,30 @@
 
     .badge {
       font-size: 9px;
-      padding: 2px 6px;
-      border-radius: 3px;
-      background: #1a2332;
-      color: #4ecca3;
-      border: 1px solid #2a3a4a;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: transparent;
+      color: var(--accent);
+      border: 1px dashed var(--accent);
       flex-shrink: 0;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
     }
 
     .delete-model-btn {
       background: none;
       border: none;
-      color: #4a5a6a;
+      color: var(--text-faint);
       cursor: pointer;
-      font-size: 14px;
+      font-size: 13px;
       padding: 2px 4px;
       line-height: 1;
-      transition: color 0.2s;
+      transition: color 0.15s;
       flex-shrink: 0;
     }
 
     .delete-model-btn:hover {
-      color: #ff6b6b;
+      color: var(--error);
     }
 
     .add-model-row {
@@ -427,25 +462,26 @@
     }
 
     .profile-chip {
-      padding: 6px 14px;
-      background: #111827;
-      border: 1px solid #1e2a3a;
-      border-radius: 20px;
-      font-size: 12px;
+      padding: 5px 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 11px;
       cursor: pointer;
-      transition: all 0.2s;
-      color: #a0b0c0;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+      color: var(--text-dim);
       font-family: inherit;
     }
 
     .profile-chip:hover {
-      border-color: #4ecca3;
+      border-color: var(--border-strong);
+      color: var(--text);
     }
 
     .profile-chip.active {
-      background: #16302a;
-      border-color: #4ecca3;
-      color: #4ecca3;
+      background: var(--accent-soft);
+      border: 1px solid var(--accent);
+      color: var(--accent);
       font-weight: 600;
     }
 
@@ -460,9 +496,9 @@
     }
 
     .assignment-card {
-      background: #111827;
-      border: 1px solid #1e2a3a;
-      border-radius: 6px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
       padding: 10px;
       margin-bottom: 6px;
     }
@@ -470,7 +506,7 @@
     .assignment-label {
       font-size: 11px;
       font-weight: 600;
-      color: #8a9ab0;
+      color: var(--text-dim);
       margin-bottom: 6px;
       display: flex;
       align-items: center;
@@ -506,9 +542,9 @@
       display: none;
       margin-bottom: 10px;
       padding: 10px;
-      background: #111827;
-      border: 1px solid #1e2a3a;
-      border-radius: 6px;
+      background: var(--surface);
+      border: 1px dashed var(--border-strong);
+      border-radius: 8px;
     }
 
     .new-profile-form.visible {
@@ -529,7 +565,7 @@
       width: 44px !important;
       flex-shrink: 0;
       text-align: center;
-      font-size: 16px !important;
+      font-size: 15px !important;
     }
 
     /* ─── Modal ─── */
@@ -537,7 +573,7 @@
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.7);
+      background: rgba(10, 10, 12, 0.72);
       z-index: 1000;
       justify-content: center;
       align-items: center;
@@ -548,19 +584,21 @@
     }
 
     .modal {
-      background: #0d0d1a;
-      border: 1px solid #1e2a3a;
+      background: var(--bg);
+      border: 1px solid var(--border);
       border-radius: 10px;
       padding: 20px;
       width: 340px;
       max-width: 95%;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
     }
 
     .modal h2 {
-      font-size: 14px;
-      color: #fff;
+      font-size: 13px;
+      color: var(--text);
       margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px dashed var(--border);
       display: flex;
       align-items: center;
       gap: 8px;
@@ -570,19 +608,20 @@
       display: flex;
       flex-direction: column;
       gap: 8px;
+      margin-bottom: 10px;
     }
 
     .modal-btn {
       width: 100%;
-      padding: 10px;
-      background: #111827;
-      border: 1px solid #1e2a3a;
+      padding: 9px;
+      background: var(--surface);
+      border: 1px solid var(--border);
       border-radius: 6px;
-      color: #c0c8d4;
+      color: var(--text-dim);
       font-size: 12px;
       font-weight: 600;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
       font-family: inherit;
       display: flex;
       align-items: center;
@@ -590,43 +629,46 @@
     }
 
     .modal-btn:hover {
-      border-color: #4ecca3;
-      color: #4ecca3;
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-soft);
     }
 
     .modal-btn .m-icon {
-      font-size: 16px;
+      font-size: 15px;
     }
 
     .modal-close {
-      margin-top: 10px;
+      margin-top: 2px;
       width: 100%;
       padding: 8px;
       background: transparent;
-      border: 1px solid #2a3a4a;
+      border: 1px dashed var(--border-strong);
       border-radius: 6px;
-      color: #6b7a8d;
+      color: var(--text-faint);
       font-size: 12px;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: color 0.15s, border-color 0.15s;
       font-family: inherit;
     }
 
     .modal-close:hover {
-      color: #e0e0e0;
-      border-color: #4a5a6a;
+      color: var(--text);
+      border-color: var(--text-faint);
     }
 
     .modal-version {
       text-align: center;
       font-size: 10px;
-      color: #3d4f5f;
-      margin-top: 10px;
+      color: var(--text-faint);
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px dashed var(--border-soft);
     }
 
     /* ─── Scrollbar ─── */
     ::-webkit-scrollbar {
-      width: 4px;
+      width: 6px;
     }
 
     ::-webkit-scrollbar-track {
@@ -634,12 +676,19 @@
     }
 
     ::-webkit-scrollbar-thumb {
-      background: #2a3a4a;
+      background: var(--border-strong);
       border-radius: 4px;
     }
 
     ::-webkit-scrollbar-thumb:hover {
-      background: #3a4a5a;
+      background: #4a4a50;
+    }
+
+    /* ─── Focus visibility ─── */
+    button:focus-visible,
+    a:focus-visible {
+      outline: 1px solid var(--accent);
+      outline-offset: 2px;
     }
 
     /* hidden file input */
@@ -659,7 +708,7 @@
       <p>Powered by OpenRouter</p>
     </div>
     <div class="header-right">
-      <button class="gear-btn" id="gearBtn" title="Settings">⚙</button>
+      <button class="gear-btn" id="gearBtn" title="Settings" aria-label="Settings">⚙</button>
     </div>
   </div>
 
@@ -676,7 +725,7 @@
       <label>OpenRouter API Key</label>
       <div class="toggle-key">
         <input type="password" id="apiKey" placeholder="sk-or-v1-…" autocomplete="off">
-        <button class="eye-btn" id="toggleKey" title="Show/Hide">👁</button>
+        <button class="eye-btn" id="toggleKey" title="Show/Hide" aria-label="Show or hide key">👁</button>
       </div>
       <p class="hint">
         Get a free key at <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a>
@@ -742,7 +791,7 @@
   </div>
 
   <!-- Status -->
-  <div class="status" id="status"></div>
+  <div class="status" id="status" aria-live="polite"></div>
 
   <!-- ══════════ Settings Modal ══════════ -->
   <div class="modal-overlay" id="settingsModal">
@@ -758,7 +807,7 @@
       </div>
       <input type="file" id="importFileInput" accept=".json">
       <button class="modal-close" id="closeModalBtn">Close</button>
-      <p class="modal-version">AI ELIT Solver v1.2.0</p>
+      <p class="modal-version">AI ELIT Solver v1.4.4</p>
     </div>
   </div>
 
