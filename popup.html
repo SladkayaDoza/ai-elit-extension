@@ -537,6 +537,84 @@
       min-width: 80px;
     }
 
+    /* ─── Fallback Tab ─── */
+    .fb-intro {
+      margin: 0 0 10px;
+    }
+
+    .fb-list {
+      margin-bottom: 4px;
+    }
+
+    .fb-empty {
+      padding: 14px 10px;
+      text-align: center;
+      font-size: 11px;
+      color: var(--text-faint);
+      border: 1px dashed var(--border-strong);
+      border-radius: 6px;
+      margin-bottom: 4px;
+    }
+
+    .fb-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px 6px 4px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      margin-bottom: 4px;
+      transition: border-color 0.15s, opacity 0.15s;
+    }
+
+    .fb-item:hover {
+      border-color: var(--border-strong);
+    }
+
+    .fb-item.dragging {
+      opacity: 0.45;
+      border-style: dashed;
+      border-color: var(--accent);
+    }
+
+    .fb-handle {
+      background: none;
+      border: none;
+      color: var(--text-faint);
+      cursor: grab;
+      font-size: 14px;
+      line-height: 1;
+      padding: 4px 3px;
+      flex-shrink: 0;
+      font-family: inherit;
+    }
+
+    .fb-handle:hover {
+      color: var(--accent);
+    }
+
+    .fb-handle:active {
+      cursor: grabbing;
+    }
+
+    .fb-num {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--accent);
+      min-width: 14px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    .fb-item .fb-reasoning,
+    .add-model-row .fb-reasoning {
+      width: 82px;
+      flex-shrink: 0;
+      padding: 5px 6px;
+      font-size: 11px;
+    }
+
     /* ─── New profile form ─── */
     .new-profile-form {
       display: none;
@@ -717,6 +795,7 @@
     <button class="tab-btn active" data-tab="main">Main</button>
     <button class="tab-btn" data-tab="models">Models</button>
     <button class="tab-btn" data-tab="profiles">Profiles</button>
+    <button class="tab-btn" data-tab="fallback">Fallback</button>
   </div>
 
   <!-- ══════════ TAB: Main ══════════ -->
@@ -790,6 +869,24 @@
     <div id="assignmentsContainer"></div>
   </div>
 
+  <!-- ══════════ TAB: Fallback ══════════ -->
+  <div class="tab-content" id="tab-fallback">
+    <p class="hint fb-intro">
+      If the profile's model fails (API error, timeout, empty or invalid response),
+      these models are tried <b>top to bottom</b>. Drag <b>⠿</b> to change the order.
+    </p>
+
+    <div class="fb-list" id="fallbackList"></div>
+
+    <div class="add-model-row">
+      <input type="text" id="newFallbackModel" list="fallbackModelOptions" placeholder="Pick or type model ID">
+      <datalist id="fallbackModelOptions"></datalist>
+      <select id="newFallbackReasoning" class="fb-reasoning"></select>
+      <button class="btn-sm" id="addFallbackBtn">+ Add</button>
+    </div>
+    <p class="hint" style="margin-top:6px">Choose from the model library or enter any OpenRouter model ID</p>
+  </div>
+
   <!-- Status -->
   <div class="status" id="status" aria-live="polite"></div>
 
@@ -807,7 +904,7 @@
       </div>
       <input type="file" id="importFileInput" accept=".json">
       <button class="modal-close" id="closeModalBtn">Close</button>
-      <p class="modal-version">AI ELIT Solver v1.4.4</p>
+      <p class="modal-version">AI ELIT Solver v1.4.5</p>
     </div>
   </div>
 

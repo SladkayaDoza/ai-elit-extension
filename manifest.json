@@ -1,12 +1,10 @@
 {
   "manifest_version": 3,
   "name": "AI ELIT Solver",
-  "version": "1.4.4",
+  "version": "1.4.5",
   "description": "Automatically answers quiz questions using AI",
   "permissions": [
-    "storage",
-    "activeTab",
-    "scripting"
+    "storage"
   ],
   "host_permissions": [
     "https://openrouter.ai/*",

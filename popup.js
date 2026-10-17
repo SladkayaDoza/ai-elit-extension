@@ -79,6 +79,7 @@ let state = {
   modelLibrary: [...BUILTIN_MODELS],
   profiles: makeDefaultProfiles(),
   activeProfile: 'lite',
+  fallbackModels: [], // [{ model, reasoning }] — tried top to bottom when the primary fails
 };
 
 let editingProfile = 'lite';
@@ -112,6 +113,7 @@ function loadState() {
       state.apiKey = data.apiKey || '';
       state.hideButton = !!data.hideButton;
       state.debugMode = !!data.debugMode;
+      state.fallbackModels = Array.isArray(data.fallbackModels) ? data.fallbackModels : [];
 
       editingProfile = state.activeProfile;
       resolve();
@@ -128,6 +130,7 @@ function saveState(extra) {
       modelLibrary: state.modelLibrary,
       profiles: state.profiles,
       activeProfile: state.activeProfile,
+      fallbackModels: state.fallbackModels,
       ...extra,
     };
     chrome.storage.local.set(payload, resolve);
@@ -229,6 +232,7 @@ function renderModelList() {
         await saveState();
         renderModelList();
         renderAssignments();
+        renderFallbackList();
       });
       item.appendChild(delBtn);
     }
@@ -249,6 +253,7 @@ $('addModelBtn').addEventListener('click', async () => {
   $('newModelName').value = '';
   renderModelList();
   renderAssignments();
+  renderFallbackList();
   showStatus('✅ Model added!');
 });
 
@@ -382,6 +387,166 @@ $('deleteProfileBtn').addEventListener('click', async () => {
   showStatus('🗑️ Profile deleted');
 });
 
+// ─── Fallback Tab ─────────────────────────────────────────────────────────────
+
+function modelDisplayName(id) {
+  const m = state.modelLibrary.find(x => x.id === id);
+  return m ? m.name : id.split('/').pop();
+}
+
+function fillReasoningOptions(sel, value) {
+  REASONING_LEVELS.forEach(r => {
+    const opt = document.createElement('option');
+    opt.value = r.value;
+    opt.textContent = r.label;
+    sel.appendChild(opt);
+  });
+  sel.value = value || 'medium';
+}
+
+async function moveFallback(from, to) {
+  if (to < 0 || to >= state.fallbackModels.length || from === to) return;
+  const [item] = state.fallbackModels.splice(from, 1);
+  state.fallbackModels.splice(to, 0, item);
+  await saveState();
+  renderFallbackList();
+}
+
+function renderFallbackList() {
+  const container = $('fallbackList');
+  container.innerHTML = '';
+
+  // Suggestions for the "add" input: library models not yet in the list
+  const datalist = $('fallbackModelOptions');
+  datalist.innerHTML = '';
+  state.modelLibrary
+    .filter(m => !state.fallbackModels.some(f => f.model === m.id))
+    .forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.id;
+      opt.label = m.name;
+      datalist.appendChild(opt);
+    });
+
+  if (!state.fallbackModels.length) {
+    container.innerHTML = '<div class="fb-empty">No fallback models — only the profile model is used</div>';
+    return;
+  }
+
+  state.fallbackModels.forEach((fb, idx) => {
+    const item = document.createElement('div');
+    item.className = 'fb-item';
+    item.dataset.idx = idx;
+
+    const handle = document.createElement('button');
+    handle.className = 'fb-handle';
+    handle.textContent = '⠿';
+    handle.title = 'Drag to reorder (or focus and press ↑/↓)';
+    handle.setAttribute('aria-label', `Reorder ${modelDisplayName(fb.model)}`);
+    // Only the handle starts a drag, so the reasoning select stays usable
+    handle.addEventListener('mousedown', () => { item.draggable = true; });
+    handle.addEventListener('mouseup', () => { item.draggable = false; });
+    handle.addEventListener('keydown', async e => {
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      e.preventDefault();
+      const to = idx + (e.key === 'ArrowUp' ? -1 : 1);
+      if (to < 0 || to >= state.fallbackModels.length) return;
+      await moveFallback(idx, to);
+      container.querySelector(`.fb-item[data-idx="${to}"] .fb-handle`)?.focus();
+    });
+
+    const num = document.createElement('span');
+    num.className = 'fb-num';
+    num.textContent = idx + 1;
+
+    const info = document.createElement('div');
+    info.className = 'model-info';
+    info.innerHTML = `
+      <div class="model-name">${escHtml(modelDisplayName(fb.model))}</div>
+      <div class="model-id">${escHtml(fb.model)}</div>
+    `;
+
+    const reasSel = document.createElement('select');
+    reasSel.className = 'fb-reasoning';
+    fillReasoningOptions(reasSel, fb.reasoning);
+    reasSel.addEventListener('change', async () => {
+      state.fallbackModels[idx].reasoning = reasSel.value;
+      await saveState();
+    });
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'delete-model-btn';
+    delBtn.textContent = '✕';
+    delBtn.title = 'Remove from fallback list';
+    delBtn.addEventListener('click', async () => {
+      state.fallbackModels.splice(idx, 1);
+      await saveState();
+      renderFallbackList();
+    });
+
+    item.addEventListener('dragstart', e => {
+      item.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', String(idx));
+    });
+    item.addEventListener('dragend', async () => {
+      item.classList.remove('dragging');
+      item.draggable = false;
+      // Persist the order the rows ended up in
+      const order = Array.from(container.querySelectorAll('.fb-item')).map(el => Number(el.dataset.idx));
+      if (order.some((v, i) => v !== i)) {
+        state.fallbackModels = order.map(i => state.fallbackModels[i]);
+        await saveState();
+        showStatus('✅ Fallback order saved');
+      }
+      renderFallbackList();
+    });
+
+    item.append(handle, num, info, reasSel, delBtn);
+    container.appendChild(item);
+  });
+}
+
+// Live reordering while dragging: put the dragged row before the first row whose middle is below the cursor
+$('fallbackList').addEventListener('dragover', e => {
+  const container = $('fallbackList');
+  const dragging = container.querySelector('.fb-item.dragging');
+  if (!dragging) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+
+  const before = Array.from(container.querySelectorAll('.fb-item:not(.dragging)')).find(el => {
+    const box = el.getBoundingClientRect();
+    return e.clientY < box.top + box.height / 2;
+  });
+  if (before) {
+    if (dragging.nextElementSibling !== before) container.insertBefore(dragging, before);
+  } else if (container.lastElementChild !== dragging) {
+    container.appendChild(dragging);
+  }
+});
+
+$('fallbackList').addEventListener('drop', e => e.preventDefault());
+
+fillReasoningOptions($('newFallbackReasoning'), 'medium');
+
+$('addFallbackBtn').addEventListener('click', async () => {
+  const model = $('newFallbackModel').value.trim();
+  if (!model) { showStatus('Pick or enter a model ID.', true); return; }
+  if (!model.includes('/')) { showStatus('Model ID should look like provider/model-name', true); return; }
+  if (state.fallbackModels.some(f => f.model === model)) { showStatus('Model is already in the fallback list.', true); return; }
+
+  state.fallbackModels.push({ model, reasoning: $('newFallbackReasoning').value });
+  await saveState();
+  $('newFallbackModel').value = '';
+  renderFallbackList();
+  showStatus(`✅ Added fallback #${state.fallbackModels.length}`);
+});
+
+$('newFallbackModel').addEventListener('keydown', e => {
+  if (e.key === 'Enter') $('addFallbackBtn').click();
+});
+
 // ─── Settings Modal ───────────────────────────────────────────────────────────
 
 $('gearBtn').addEventListener('click', () => {
@@ -465,6 +630,7 @@ function renderAll() {
   renderModelList();
   renderProfileSelector();
   renderAssignments();
+  renderFallbackList();
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────

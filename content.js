@@ -395,6 +395,25 @@ async function resolveModelConfig(taskType) {
 }
 
 /**
+ * Builds the ordered list of models to try: the profile's primary model first,
+ * then the user's fallback models (top to bottom), skipping duplicates.
+ * @returns {Promise<Array<{ model: string, reasoning: string }>>}
+ */
+async function resolveModelChain(taskType) {
+  const primary = await resolveModelConfig(taskType);
+  const { fallbackModels } = await getStorage(['fallbackModels']);
+
+  const chain = [primary];
+  const seen = new Set([primary.model]);
+  (Array.isArray(fallbackModels) ? fallbackModels : []).forEach(fb => {
+    if (!fb || !fb.model || seen.has(fb.model)) return;
+    seen.add(fb.model);
+    chain.push({ model: fb.model, reasoning: fb.reasoning || primary.reasoning });
+  });
+  return chain;
+}
+
+/**
  * Detects the specific task type key for profile-based model resolution.
  */
 function detectTaskType(formData) {
@@ -409,12 +428,15 @@ function detectTaskType(formData) {
 
 // ─── OpenRouter API Call — Generic ──────────────────────────────────────────
 
+/**
+ * Returns { raw } on success or { error, fatal } on failure.
+ * `fatal` errors (e.g. invalid API key) make no sense to retry with another model.
+ */
 async function callOpenRouterGeneric(systemPrompt, userPrompt, retryNum = 0, modelConfig = null) {
   const { apiKey, debugMode } = await getStorage(['apiKey', 'debugMode']);
 
   if (!apiKey) {
-    showToast('⚠️ API key not set. Open the extension popup.', 'error');
-    return null;
+    return { error: 'API key not set. Open the extension popup.', fatal: true };
   }
 
   const usedModel = (modelConfig && modelConfig.model) || DEFAULT_MODEL;
@@ -475,8 +497,7 @@ async function callOpenRouterGeneric(systemPrompt, userPrompt, retryNum = 0, mod
       const err = await response.json().catch(() => ({}));
       const msg = err?.error?.message || `HTTP ${response.status}`;
       if (debugMode) console.error('[AI ELIT] API Error:', err);
-      showToast(`❌ API Error: ${msg}`, 'error');
-      return null;
+      return { error: `API Error: ${msg}`, fatal: response.status === 401 };
     }
 
     const data = await response.json();
@@ -489,14 +510,67 @@ async function callOpenRouterGeneric(systemPrompt, userPrompt, retryNum = 0, mod
       console.groupEnd();
     }
 
-    return raw || null;
+    if (data?.error) {
+      // OpenRouter may return 200 with an upstream provider error in the body
+      return { error: `API Error: ${data.error.message || 'provider error'}` };
+    }
+    if (!raw) return { error: 'Empty response from model' };
+    return { raw };
 
   } catch (err) {
     clearTimeout(timeoutId);
     const msg = err.name === 'AbortError' ? 'Request timed out (60s)' : err.message;
-    showToast(`❌ Network error: ${msg}`, 'error');
-    return null;
+    return { error: `Network error: ${msg}` };
   }
+}
+
+const shortModelName = id => String(id).split('/').pop();
+
+/**
+ * Runs a prompt through the model chain (primary → fallbacks, top to bottom).
+ * Each model gets up to RETRY_COUNT extra attempts for unparseable responses;
+ * API/network errors switch to the next model immediately.
+ * @param {(parsed: any) => any} extract — returns the result, or null if the response is unusable
+ */
+async function runWithFallback(taskLabel, systemPrompt, userPrompt, modelChain, extract) {
+  let lastError = '';
+
+  for (let m = 0; m < modelChain.length; m++) {
+    const mc = modelChain[m];
+    const next = modelChain[m + 1];
+
+    for (let attempt = 0; attempt <= RETRY_COUNT; attempt++) {
+      const res = await callOpenRouterGeneric(systemPrompt, userPrompt, attempt, mc);
+
+      if (res.error) {
+        lastError = res.error;
+        console.warn(`[AI ELIT] ${mc.model}: ${res.error}`);
+        if (res.fatal) {
+          showToast(`❌ ${res.error}`, 'error');
+          return null;
+        }
+        break; // → next model
+      }
+
+      const result = extract(parseJsonSafe(res.raw));
+      if (result != null) {
+        if (m > 0) console.log(`[AI ELIT] ${taskLabel} solved by fallback model ${mc.model}`);
+        return result;
+      }
+
+      lastError = 'Unexpected AI response';
+      console.warn(`[AI ELIT] ${taskLabel} — ${mc.model} attempt ${attempt + 1}: could not parse:`, res.raw);
+      if (attempt < RETRY_COUNT) showToast('⟳ Retrying with different parameters…', 'info');
+    }
+
+    if (next) {
+      showToast(`↪ ${shortModelName(mc.model)} failed (${lastError}). Trying ${shortModelName(next.model)}…`, 'error');
+    }
+  }
+
+  const tried = modelChain.length > 1 ? ` (tried ${modelChain.length} models)` : '';
+  showToast(`❌ ${taskLabel}: ${lastError}${tried}. Check console.`, 'error');
+  return null;
 }
 
 // ─── Solvers for Each Question Type ────────────────────────────────────────
@@ -515,7 +589,7 @@ Use the language of the question for the justification and generated answers, un
 
 Return exactly one valid JSON object with the specified keys. Use double-quoted strings, escape special characters correctly, and do not use trailing commas. Include no Markdown fences, introductory text, or commentary outside the JSON object.`;
 
-async function solveRadioCheckbox(formData, modelConfig) {
+async function solveRadioCheckbox(formData, modelChain) {
   const { question, choices, isMultiple } = formData;
   const questionCtx = buildQuestionContext(question);
 
@@ -552,28 +626,16 @@ ${selectionMode}
 
 Return the required JSON object with the selected indices and a concise justification.`;
 
-  for (let attempt = 0; attempt <= RETRY_COUNT; attempt++) {
-    const raw = await callOpenRouterGeneric(systemPrompt, userPrompt, attempt, modelConfig);
-    if (raw === null) return null;
-
-    const parsed = parseJsonSafe(raw);
-
+  return runWithFallback('Choice', systemPrompt, userPrompt, modelChain, parsed => {
     // New format: {"reasoning": "...", "answer": [0, 2]}
     if (parsed && parsed.answer && Array.isArray(parsed.answer)) return parsed.answer;
     // Legacy format: plain array [0, 2]
     if (parsed && Array.isArray(parsed)) return parsed;
-
-    console.warn(`[AI ELIT] Attempt ${attempt + 1}: Could not parse response:`, raw);
-    if (attempt < RETRY_COUNT) {
-      showToast('⟳ Retrying with different parameters…', 'info');
-    }
-  }
-
-  showToast('⚠️ Unexpected AI response after retries. Check console.', 'error');
-  return null;
+    return null;
+  });
 }
 
-async function solveMatching(formData, modelConfig) {
+async function solveMatching(formData, modelChain) {
   const { question, selects, groups, choices } = formData;
   const questionCtx = buildQuestionContext(question);
 
@@ -654,22 +716,12 @@ ${promptBody}
 
 Return the required JSON object with exact option text and a concise justification.`;
 
-  for (let attempt = 0; attempt <= RETRY_COUNT; attempt++) {
-    const raw = await callOpenRouterGeneric(systemPrompt, userPrompt, attempt, modelConfig);
-    if (raw === null) return null;
-
-    const parsed = parseJsonSafe(raw);
-    if (parsed && parsed.matches && typeof parsed.matches === 'object') return parsed;
-
-    console.warn(`[AI ELIT] Matching attempt ${attempt + 1}: Could not parse:`, raw);
-    if (attempt < RETRY_COUNT) showToast('⟳ Retrying…', 'info');
-  }
-
-  showToast('⚠️ Could not parse matching response.', 'error');
-  return null;
+  return runWithFallback('Matching', systemPrompt, userPrompt, modelChain, parsed =>
+    (parsed && parsed.matches && typeof parsed.matches === 'object') ? parsed : null
+  );
 }
 
-async function solveTextInput(formData, modelConfig) {
+async function solveTextInput(formData, modelChain) {
   const { question, textInputs } = formData;
   const questionCtx = buildQuestionContext(question);
 
@@ -711,19 +763,9 @@ ${fields}
 
 Return the required JSON object with answers in field order and a concise justification.`;
 
-  for (let attempt = 0; attempt <= RETRY_COUNT; attempt++) {
-    const raw = await callOpenRouterGeneric(systemPrompt, userPrompt, attempt, modelConfig);
-    if (raw === null) return null;
-
-    const parsed = parseJsonSafe(raw);
-    if (parsed && parsed.text_answers && Array.isArray(parsed.text_answers)) return parsed;
-
-    console.warn(`[AI ELIT] Text input attempt ${attempt + 1}: Could not parse:`, raw);
-    if (attempt < RETRY_COUNT) showToast('⟳ Retrying…', 'info');
-  }
-
-  showToast('⚠️ Could not parse text input response.', 'error');
-  return null;
+  return runWithFallback('Text input', systemPrompt, userPrompt, modelChain, parsed =>
+    (parsed && parsed.text_answers && Array.isArray(parsed.text_answers)) ? parsed : null
+  );
 }
 
 // ─── Apply Answers ────────────────────────────────────────────────────────────
@@ -916,7 +958,7 @@ function createAIButton() {
   const btn = document.createElement('a');
   btn.id = 'aqs-btn';
   btn.href = '#';
-  btn.className = 'btn mt-2';
+  btn.className = 'btn';
   btn.innerHTML = `<span class="aqs-icon">✦</span> <span class="aqs-label">Answer with AI</span>`;
 
   Object.assign(btn.style, {
@@ -1032,8 +1074,8 @@ async function solveCurrentForm() {
       const taskType = formData.isMultiple ? 'radio_multiple' : 'radio_single';
       // Override task type if question has images
       const effectiveType = (formData.question?.images?.length > 0) ? 'image' : taskType;
-      const mc = await resolveModelConfig(effectiveType);
-      const indices = await solveRadioCheckbox(formData, mc);
+      const chain = await resolveModelChain(effectiveType);
+      const indices = await solveRadioCheckbox(formData, chain);
       if (indices !== null) {
         const applied = applyRadioCheckbox(formData.choices, indices);
         totalApplied += applied;
@@ -1048,8 +1090,8 @@ async function solveCurrentForm() {
     // ── Handle matching ──
     if (formData.type === 'matching') {
       const effectiveType = (formData.question?.images?.length > 0) ? 'image' : 'matching';
-      const mc = await resolveModelConfig(effectiveType);
-      const matchResult = await solveMatching(formData, mc);
+      const chain = await resolveModelChain(effectiveType);
+      const matchResult = await solveMatching(formData, chain);
       if (matchResult !== null) {
         const applied = applyMatching(formData, matchResult);
         totalApplied += applied;
@@ -1060,8 +1102,8 @@ async function solveCurrentForm() {
     // ── Handle text inputs ──
     if (formData.textInputs.length > 0) {
       const effectiveType = (formData.question?.images?.length > 0) ? 'image' : 'text_input';
-      const mc = await resolveModelConfig(effectiveType);
-      const textResult = await solveTextInput(formData, mc);
+      const chain = await resolveModelChain(effectiveType);
+      const textResult = await solveTextInput(formData, chain);
       if (textResult !== null) {
         const applied = applyTextInputs(formData, textResult);
         totalApplied += applied;
