@@ -748,12 +748,14 @@ Rules:
 2. Field indices identify positions on the page; they are not the answers.
 3. Follow any answer-format instructions in the question, including units, precision, notation, and length.
 4. For a short-answer field, provide only the required number, expression, word, or phrase, without explanatory prefixes.
-5. For a long-answer field, provide a concise but complete response. Do not omit necessary content merely to fit an arbitrary sentence limit.
-6. For numbers and expressions, use the notation expected by the question. Do not add Markdown or LaTeX delimiters unless explicitly requested.
-7. Determine whether the task explicitly requires ordering, sequencing, or ranking. If fields request ranks, return the rank as a string for each corresponding item. Do not assume all ordering tasks require unique consecutive integers; follow the question's rules about ties and numbering.
-8. The justification must agree with the answers.
-9. The supplied context may be incomplete or ambiguous. If a field's purpose is unclear, infer it from the overall question and surrounding context, and still provide the most plausible answer. Every supplied field must receive an answer; never return an empty "text_answers" array or fewer answers than there are fields.
-10. Include only the keys "reasoning" and "text_answers".`;
+5. For a long-answer field, write briefly: usually 1-3 sentences, unless the question explicitly asks for more. Get straight to the point; no introductions, no restating the question, no summary at the end.
+6. Write text answers the way a real student would type them by hand: simple, natural wording, plain everyday vocabulary, slightly informal is fine. Avoid typical AI patterns: no lists or bullet points, no headings, no "Firstly/Secondly/In conclusion", no "It is important to note", no "plays a key role", no "not only... but also", no groups of three adjectives, no flowery or bureaucratic phrasing, no excessive hedging.
+7. Never use the em dash (—) or en dash (–). Use a comma, a colon, a period, or a plain hyphen (-) instead.
+8. For numbers and expressions, use the notation expected by the question. Do not add Markdown or LaTeX delimiters unless explicitly requested.
+9. Determine whether the task explicitly requires ordering, sequencing, or ranking. If fields request ranks, return the rank as a string for each corresponding item. Do not assume all ordering tasks require unique consecutive integers; follow the question's rules about ties and numbering.
+10. The justification must agree with the answers.
+11. The supplied context may be incomplete or ambiguous. If a field's purpose is unclear, infer it from the overall question and surrounding context, and still provide the most plausible answer. Every supplied field must receive an answer; never return an empty "text_answers" array or fewer answers than there are fields.
+12. Include only the keys "reasoning" and "text_answers".`;
 
 const userPrompt = `Question:
 ${questionCtx}
@@ -763,9 +765,14 @@ ${fields}
 
 Return the required JSON object with answers in field order and a concise justification.`;
 
-  return runWithFallback('Text input', systemPrompt, userPrompt, modelChain, parsed =>
-    (parsed && parsed.text_answers && Array.isArray(parsed.text_answers)) ? parsed : null
-  );
+  return runWithFallback('Text input', systemPrompt, userPrompt, modelChain, parsed => {
+    if (!parsed || !parsed.text_answers || !Array.isArray(parsed.text_answers)) return null;
+    // Models still slip in long dashes sometimes; swap them for a plain hyphen.
+    parsed.text_answers = parsed.text_answers.map(a =>
+      typeof a === 'string' ? a.replace(/[–—]/g, '-') : a
+    );
+    return parsed;
+  });
 }
 
 // ─── Apply Answers ────────────────────────────────────────────────────────────
@@ -958,7 +965,7 @@ function createAIButton() {
   const btn = document.createElement('a');
   btn.id = 'aqs-btn';
   btn.href = '#';
-  btn.className = 'btn';
+  btn.className = 'btn mt-2';
   btn.innerHTML = `<span class="aqs-icon">✦</span> <span class="aqs-label">Answer with AI</span>`;
 
   Object.assign(btn.style, {
