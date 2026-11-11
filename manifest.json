@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "AI ELIT Solver",
-  "version": "1.5.0",
-  "description": "Automatically answers quiz questions using AI",
+  "version": "1.5.5",
+  "description": "AI answers for ELIT tests: picks the right options or just shows them. Stealth mode, any OpenRouter model, cost tracking.",
   "permissions": [
     "storage"
   ],
