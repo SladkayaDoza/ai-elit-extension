@@ -3,19 +3,8 @@
 const $ = id => document.getElementById(id);
 
 // ─── Default Data ────────────────────────────────────────────────────────────
-
-const BUILTIN_MODELS = [
-  { id: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Llama 3.3 70B (free)', builtin: true },
-  { id: 'google/gemini-3-flash-preview', name: 'gemini-3-flash-preview', builtin: true },
-  { id: 'meta-llama/llama-3.1-405b-instruct', name: 'Llama 3.1 405B', builtin: true },
-  { id: 'deepseek/deepseek-v4-pro', name: 'DeepSeek V4 Pro', builtin: true },
-  { id: 'anthropic/claude-sonnet-4.6', name: 'Sonnet 4.6', builtin: true },
-  { id: 'anthropic/claude-opus-4.8', name: 'Opus 4.8', builtin: true },
-  { id: 'anthropic/claude-opus-5.5', name: 'Opus 5.5', builtin: true },
-  { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini', builtin: true },
-  { id: 'openai/gpt-5.5', name: 'GPT-5.5', builtin: true },
-  { id: 'openai/gpt-4o', name: 'GPT-4o', builtin: true },
-];
+// BUILTIN_MODELS, DEFAULT_MODEL_ID, DEFAULT_FALLBACKS, makeDefaultProfiles,
+// makeDefaultAssignments and getMigratedStorage come from models.js.
 
 const TASK_TYPES = [
   { key: 'radio_single', icon: '📻', label: 'Single Answer (radio)' },
@@ -33,92 +22,39 @@ const REASONING_LEVELS = [
   { value: 'high', label: 'High' },
 ];
 
-const DEFAULT_MODEL_ID = 'google/gemini-3-flash-preview';
-
-function makeDefaultAssignments(modelId, reasoning) {
-  const a = {};
-  TASK_TYPES.forEach(t => {
-    a[t.key] = { model: modelId || DEFAULT_MODEL_ID, reasoning: reasoning || 'medium' };
-  });
-  return a;
-}
-
-function makeDefaultProfiles(modelId, reasoning) {
-  return {
-    lite: {
-      name: 'Lite', icon: '⚡',
-      assignments: {
-        radio_single: { model: modelId || DEFAULT_MODEL_ID, reasoning: reasoning || 'low' },
-        radio_multiple: { model: modelId || 'google/gemini-3-flash-preview', reasoning: reasoning || 'low' },
-        matching: { model: modelId || 'google/gemini-3-flash-preview', reasoning: reasoning || 'medium' },
-        text_input: { model: modelId || 'google/gemini-3-flash-preview', reasoning: reasoning || 'low' },
-        image: { model: 'anthropic/claude-opus-4.6', reasoning: 'medium' },
-        mixed: { model: modelId || 'google/gemini-3-flash-preview', reasoning: reasoning || 'medium' },
-      }
-    },
-    pro: {
-      name: 'Pro', icon: '🔥',
-      assignments: {
-        radio_single: { model: 'anthropic/claude-sonnet-4.6', reasoning: 'low' },
-        radio_multiple: { model: 'anthropic/claude-sonnet-4.6', reasoning: 'low' },
-        matching: { model: 'anthropic/claude-opus-4.6', reasoning: 'medium' },
-        text_input: { model: 'anthropic/claude-sonnet-4.6', reasoning: 'medium' },
-        image: { model: 'anthropic/claude-opus-4.6', reasoning: 'medium' },
-        mixed: { model: 'anthropic/claude-opus-4.6', reasoning: 'medium' },
-      }
-    }
-  };
-}
-
 // ─── State ────────────────────────────────────────────────────────────────────
 
 let state = {
   apiKey: '',
   hideButton: false,
   debugMode: false,
+  autoFill: true,       // fill answers in (off = only show them)
+  autoFillOther: true,  // also fill matching/dropdowns/text (only while autoFill is on)
   modelLibrary: [...BUILTIN_MODELS],
   profiles: makeDefaultProfiles(),
   activeProfile: 'lite',
-  fallbackModels: [], // [{ model, reasoning }] — tried top to bottom when the primary fails
+  fallbackModels: DEFAULT_FALLBACKS.map(f => ({ ...f })), // tried top to bottom when the primary fails
 };
 
 let editingProfile = 'lite';
 
 // ─── Storage helpers ─────────────────────────────────────────────────────────
 
-function loadState() {
-  return new Promise(resolve => {
-    chrome.storage.local.get(null, async data => {
-      // Migration from old format
-      if (!data.profiles) {
-        const oldModel = data.model || DEFAULT_MODEL_ID;
-        const oldReasoning = data.reasoningLevel || 'medium';
-        state.profiles = makeDefaultProfiles(oldModel, oldReasoning);
-        state.activeProfile = 'lite';
-        state.modelLibrary = [...BUILTIN_MODELS];
+async function loadState() {
+  // Migrates old saved settings (retired models, missing fallbacks) on the way
+  const data = await getMigratedStorage();
 
-        // Add old custom model to library if not present
-        if (oldModel && !BUILTIN_MODELS.find(m => m.id === oldModel)) {
-          state.modelLibrary.push({ id: oldModel, name: oldModel.split('/').pop(), builtin: false });
-        }
+  state.profiles = (data.profiles && Object.keys(data.profiles).length) ? data.profiles : makeDefaultProfiles();
+  state.activeProfile = state.profiles[data.activeProfile] ? data.activeProfile : Object.keys(state.profiles)[0];
+  state.modelLibrary = Array.isArray(data.modelLibrary) && data.modelLibrary.length ? data.modelLibrary : [...BUILTIN_MODELS];
+  state.apiKey = data.apiKey || '';
+  state.hideButton = !!data.hideButton;
+  state.debugMode = !!data.debugMode;
+  state.autoFill = data.autoFill !== false;
+  state.autoFillOther = data.autoFillOther !== false;
+  state.fallbackModels = Array.isArray(data.fallbackModels) ? data.fallbackModels : [];
 
-        // Persist migrated data immediately so content.js can read it
-        await saveState();
-      } else {
-        state.profiles = data.profiles;
-        state.activeProfile = data.activeProfile || Object.keys(data.profiles)[0] || 'lite';
-        state.modelLibrary = data.modelLibrary || [...BUILTIN_MODELS];
-      }
-
-      state.apiKey = data.apiKey || '';
-      state.hideButton = !!data.hideButton;
-      state.debugMode = !!data.debugMode;
-      state.fallbackModels = Array.isArray(data.fallbackModels) ? data.fallbackModels : [];
-
-      editingProfile = state.activeProfile;
-      resolve();
-    });
-  });
+  editingProfile = state.activeProfile;
 }
 
 function saveState(extra) {
@@ -127,6 +63,8 @@ function saveState(extra) {
       apiKey: state.apiKey,
       hideButton: state.hideButton,
       debugMode: state.debugMode,
+      autoFill: state.autoFill,
+      autoFillOther: state.autoFillOther,
       modelLibrary: state.modelLibrary,
       profiles: state.profiles,
       activeProfile: state.activeProfile,
@@ -157,6 +95,8 @@ const saveBtn = $('saveBtn');
 const statusEl = $('status');
 const hideButtonToggle = $('hideButton');
 const debugModeToggle = $('debugMode');
+const autoFillToggle = $('autoFill');
+const autoFillOtherToggle = $('autoFillOther');
 
 toggleKey.addEventListener('click', () => {
   const isPass = apiKeyInput.type === 'password';
@@ -190,6 +130,8 @@ saveBtn.addEventListener('click', async () => {
   state.apiKey = apiKey;
   state.activeProfile = activeProfileSel.value;
   await saveState();
+  // A new key may have credits: stop forcing the free models
+  chrome.storage.local.remove('noCreditsAt', refreshBanners);
   showStatus('✅ Saved!');
 });
 
@@ -197,6 +139,27 @@ hideButtonToggle.addEventListener('change', async () => {
   state.hideButton = hideButtonToggle.checked;
   await saveState();
   showStatus(state.hideButton ? '🙈 Button hidden' : '👁 Button visible');
+});
+
+function renderAutoFill() {
+  autoFillToggle.checked = state.autoFill;
+  autoFillOtherToggle.checked = state.autoFillOther;
+  // The sub-switch only matters while auto-fill itself is on
+  autoFillOtherToggle.disabled = !state.autoFill;
+  document.querySelectorAll('.sub-toggle').forEach(el => el.classList.toggle('disabled', !state.autoFill));
+}
+
+autoFillToggle.addEventListener('change', async () => {
+  state.autoFill = autoFillToggle.checked;
+  renderAutoFill();
+  await saveState();
+  showStatus(state.autoFill ? '✍️ Auto-fill ON' : '👁 Show answers only');
+});
+
+autoFillOtherToggle.addEventListener('change', async () => {
+  state.autoFillOther = autoFillOtherToggle.checked;
+  await saveState();
+  showStatus(state.autoFillOther ? '✍️ Filling all question types' : '✍️ Filling radio/checkbox only');
 });
 
 debugModeToggle.addEventListener('change', async () => {
@@ -283,8 +246,13 @@ function renderAssignments() {
   const profile = state.profiles[editingProfile];
   if (!profile) return;
 
+  profile.assignments = profile.assignments || {};
   TASK_TYPES.forEach(tt => {
-    const assignment = profile.assignments[tt.key] || { model: DEFAULT_MODEL_ID, reasoning: 'medium' };
+    // Create missing entries (e.g. from an imported config) so the change handlers below can write to them
+    if (!profile.assignments[tt.key]) {
+      profile.assignments[tt.key] = { model: DEFAULT_MODEL_ID, reasoning: DEFAULT_REASONING };
+    }
+    const assignment = profile.assignments[tt.key];
 
     const card = document.createElement('div');
     card.className = 'assignment-card';
@@ -353,8 +321,14 @@ $('createProfileBtn').addEventListener('click', async () => {
   const icon = $('newProfileIcon').value.trim() || '📦';
   if (!name) { showStatus('Enter a profile name.', true); return; }
 
-  const key = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
-  if (state.profiles[key]) { showStatus('Profile with this name already exists.', true); return; }
+  const nameTaken = Object.values(state.profiles)
+    .some(p => p.name.trim().toLowerCase() === name.toLowerCase());
+  if (nameTaken) { showStatus('Profile with this name already exists.', true); return; }
+
+  // Non-Latin names (e.g. Cyrillic) all collapse to "____", so make the key unique
+  const base = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'profile';
+  let key = base;
+  for (let n = 2; state.profiles[key]; n++) key = `${base}_${n}`;
 
   state.profiles[key] = {
     name,
@@ -608,6 +582,59 @@ $('importFileInput').addEventListener('change', (e) => {
   e.target.value = '';
 });
 
+// ─── Status Banners ───────────────────────────────────────────────────────────
+// With the button hidden nothing is shown on the page, so the last result and
+// the "out of credits" state are shown here (and as a badge on the icon).
+
+const STATUS_ICONS = { working: '⏳', success: '✅', error: '❌' };
+
+function formatTime(ts) {
+  return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function renderBanners(data) {
+  const last = data.lastStatus;
+  const banner = $('statusBanner');
+  if (last && last.text) {
+    banner.className = 'banner ' + (last.state || '');
+    // Toasts already start with an emoji; add one only if missing
+    const text = /^\p{Extended_Pictographic}/u.test(last.text) ? last.text : `${STATUS_ICONS[last.state] || ''} ${last.text}`;
+    $('statusBannerText').textContent = text;
+    $('statusBannerTime').textContent = formatTime(last.time);
+    banner.hidden = false;
+  } else {
+    banner.hidden = true;
+  }
+
+  const noCreditsAt = data.noCreditsAt;
+  const creditsOut = noCreditsAt && Date.now() - noCreditsAt < NO_CREDITS_RETRY_MS;
+  $('creditsBanner').hidden = !creditsOut;
+  if (creditsOut) {
+    $('creditsBannerText').textContent =
+      `💳 OpenRouter credits ran out — using free models. Paid models are tried again at ${formatTime(noCreditsAt + NO_CREDITS_RETRY_MS)}.`;
+  }
+}
+
+function refreshBanners() {
+  chrome.storage.local.get(['lastStatus', 'noCreditsAt'], renderBanners);
+}
+
+$('statusBannerClose').addEventListener('click', () => {
+  chrome.storage.local.remove('lastStatus', refreshBanners);
+});
+
+$('creditsRetryBtn').addEventListener('click', () => {
+  chrome.storage.local.remove('noCreditsAt', refreshBanners);
+});
+
+// Live updates while the popup is open (e.g. a solve finishes)
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && (changes.lastStatus || changes.noCreditsAt)) refreshBanners();
+});
+
+$('freeModelsHint').textContent =
+  `If your OpenRouter credits run out, free models are used automatically: ${FREE_MODELS.map(f => f.name).join(' → ')}.`;
+
 // ─── Utility ──────────────────────────────────────────────────────────────────
 
 function showStatus(msg, isError = false) {
@@ -626,6 +653,7 @@ function renderAll() {
   apiKeyInput.value = state.apiKey;
   hideButtonToggle.checked = state.hideButton;
   debugModeToggle.checked = state.debugMode;
+  renderAutoFill();
   renderActiveProfileSelect();
   renderModelList();
   renderProfileSelector();
@@ -636,3 +664,4 @@ function renderAll() {
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 loadState().then(renderAll);
+refreshBanners();

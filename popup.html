@@ -301,6 +301,23 @@
       line-height: 1.4;
     }
 
+    /* Sub-switch: indented under its parent, greyed out while the parent is off */
+    .sub-toggle {
+      margin-left: 18px;
+    }
+
+    .toggle-field.sub-toggle {
+      margin-top: 0;
+    }
+
+    .sub-toggle.disabled {
+      opacity: 0.45;
+    }
+
+    .sub-toggle.disabled .slider {
+      cursor: not-allowed;
+    }
+
     /* ─── Buttons ─── */
     .save-btn {
       width: 100%;
@@ -367,6 +384,56 @@
 
     .status.error {
       color: var(--error);
+    }
+
+    /* ─── Status banners (last solve result, credits) ─── */
+    .banner {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 10px;
+      padding: 8px 10px;
+      border: 1px solid var(--border-strong);
+      border-radius: 6px;
+      background: var(--raised);
+      font-size: 11px;
+      line-height: 1.45;
+      color: var(--text-dim);
+    }
+
+    .banner[hidden] {
+      display: none;
+    }
+
+    .banner.error,
+    .banner.warn {
+      border-color: var(--error);
+    }
+
+    .banner-text {
+      flex: 1;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .banner-time {
+      display: block;
+      color: var(--text-faint);
+      font-size: 10px;
+    }
+
+    .banner-btn {
+      flex-shrink: 0;
+      background: none;
+      border: none;
+      color: var(--text-faint);
+      cursor: pointer;
+      font-size: 11px;
+      padding: 0 2px;
+    }
+
+    .banner-btn:hover {
+      color: var(--text);
     }
 
     /* ─── Models Tab ─── */
@@ -790,6 +857,19 @@
     </div>
   </div>
 
+  <!-- Status banners: on-page notifications are off when the button is hidden -->
+  <div class="banner warn" id="creditsBanner" role="status" hidden>
+    <div class="banner-text" id="creditsBannerText"></div>
+    <button class="banner-btn" id="creditsRetryBtn" title="Use paid models again now">Retry paid</button>
+  </div>
+  <div class="banner" id="statusBanner" role="status" hidden>
+    <div class="banner-text">
+      <span id="statusBannerText"></span>
+      <span class="banner-time" id="statusBannerTime"></span>
+    </div>
+    <button class="banner-btn" id="statusBannerClose" title="Dismiss" aria-label="Dismiss">✕</button>
+  </div>
+
   <!-- Tabs -->
   <div class="tabs">
     <button class="tab-btn active" data-tab="main">Main</button>
@@ -825,7 +905,25 @@
         <span class="slider"></span>
       </label>
     </div>
-    <p class="toggle-hint">Button hidden, but <b>\</b> hotkey still works</p>
+    <p class="toggle-hint">Hides the button and all on-page notifications. The <b>\</b> hotkey still works; results show on the extension icon and here.</p>
+
+    <div class="toggle-field">
+      <label for="autoFill">Auto-fill answers</label>
+      <label class="toggle-switch">
+        <input type="checkbox" id="autoFill">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <p class="toggle-hint">Off: nothing is filled in, the answer is only shown (option numbers on the extension icon, full answer here).</p>
+
+    <div class="toggle-field sub-toggle" id="autoFillOtherRow">
+      <label for="autoFillOther">Also fill matching, dropdowns and text fields</label>
+      <label class="toggle-switch">
+        <input type="checkbox" id="autoFillOther">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <p class="toggle-hint sub-toggle">Off: only radio and checkbox answers are filled in; other answers are only shown.</p>
 
     <div class="toggle-field">
       <label for="debugMode">Debug mode (log prompts to console)</label>
@@ -885,6 +983,7 @@
       <button class="btn-sm" id="addFallbackBtn">+ Add</button>
     </div>
     <p class="hint" style="margin-top:6px">Choose from the model library or enter any OpenRouter model ID</p>
+    <p class="hint" style="margin-top:6px" id="freeModelsHint"></p>
   </div>
 
   <!-- Status -->
@@ -908,6 +1007,7 @@
     </div>
   </div>
 
+  <script src="models.js"></script>
   <script src="popup.js"></script>
 </body>
 

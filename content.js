@@ -2,11 +2,12 @@
 // Watches for the ELIT form, injects "Answer with AI" button, calls OpenRouter.
 // Supports: radio, checkbox, select/matching, text inputs. Hotkey: \
 
-const DEFAULT_MODEL = 'anthropic/claude-opus-4.8';
-const DEFAULT_REASONING = 'medium';
+// DEFAULT_MODEL_ID, DEFAULT_REASONING and getMigratedStorage come from models.js
 const MAX_TOKENS = 16384;
 const RETRY_COUNT = 2;
-const FETCH_TIMEOUT_MS = 60000;
+const FETCH_TIMEOUT_MS = 120000; // reasoning models regularly need more than a minute
+const MAX_IMAGES = 6;
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -225,17 +226,22 @@ function extractFormData(form) {
   const hasChoices = choices.length > 0;
   const hasSelects = selects.length > 0;
   const hasTexts = textInputs.length > 0;
-  const groupNames = Object.keys(groups);
-  const isMatching = hasSelects || (hasChoices && groupNames.length > 1);
+  // Several radio groups = one choice per statement (matching). Checkboxes often get
+  // a separate name each (answer[1], answer[2]…), which is still one multiple-choice question.
+  const radioGroups = new Set(choices.filter(c => c.el.type === 'radio').map(c => c.name));
+  const isRadioMatching = radioGroups.size > 1;
 
   let type = 'radio_checkbox';
-  if (isMatching && hasChoices && groupNames.length > 1) type = 'matching';
+  if (isRadioMatching) type = 'matching';
   else if (hasSelects) type = 'matching';
   else if (hasTexts && !hasChoices) type = 'text_input';
   else if (hasTexts && hasChoices) type = 'mixed';
 
   return {
     type,
+    // Matching built from radio groups: those radios ARE the matching answers,
+    // so they must not also be solved as a separate choice question
+    radioMatching: isRadioMatching,
     question: q,
     choices,
     groups,
@@ -357,7 +363,7 @@ function buildQuestionContext(q) {
   let ctx = '';
   if (q.text) ctx += q.text;
   if (q.images && q.images.length) {
-    ctx += '\n\n[The question contains images: ' + q.images.join(', ') + ']';
+    ctx += '\n\n[The question contains ' + q.images.length + ' image(s); the readable ones are attached to this message.]';
   }
   if (!q.text && q.html) {
     ctx += '\n\n[The question text could not be extracted cleanly. Here is the HTML of the question block:]\n' + q.html;
@@ -373,12 +379,9 @@ function buildQuestionContext(q) {
  * @param {string} taskType — one of: radio_single, radio_multiple, matching, text_input, image, mixed
  * @returns {{ model: string, reasoning: string }}
  */
-async function resolveModelConfig(taskType) {
-  const { profiles, activeProfile, model, reasoningLevel } = await getStorage([
-    'profiles', 'activeProfile', 'model', 'reasoningLevel'
-  ]);
+function resolveModelConfig(taskType, settings) {
+  const { profiles, activeProfile } = settings;
 
-  // New profile-based system
   if (profiles && activeProfile && profiles[activeProfile]) {
     const profile = profiles[activeProfile];
     const assignment = profile.assignments && profile.assignments[taskType];
@@ -386,12 +389,7 @@ async function resolveModelConfig(taskType) {
       return { model: assignment.model, reasoning: assignment.reasoning || DEFAULT_REASONING };
     }
   }
-
-  // Legacy fallback: single model + single reasoning level
-  return {
-    model: model || DEFAULT_MODEL,
-    reasoning: reasoningLevel || DEFAULT_REASONING,
-  };
+  return { model: DEFAULT_MODEL_ID, reasoning: DEFAULT_REASONING };
 }
 
 /**
@@ -400,8 +398,15 @@ async function resolveModelConfig(taskType) {
  * @returns {Promise<Array<{ model: string, reasoning: string }>>}
  */
 async function resolveModelChain(taskType) {
-  const primary = await resolveModelConfig(taskType);
-  const { fallbackModels } = await getStorage(['fallbackModels']);
+  // Migrates saved settings (retired models, default fallbacks) even if the popup was never opened
+  const settings = await getMigratedStorage();
+  const primary = resolveModelConfig(taskType, settings);
+  const { fallbackModels, noCreditsAt } = settings;
+
+  // Credits ran out recently: go straight to the free models (no failing paid request first)
+  if (noCreditsAt && Date.now() - noCreditsAt < NO_CREDITS_RETRY_MS) {
+    return freeModelChain(primary.reasoning, taskType === 'image');
+  }
 
   const chain = [primary];
   const seen = new Set([primary.model]);
@@ -413,17 +418,68 @@ async function resolveModelChain(taskType) {
   return chain;
 }
 
+function freeModelChain(reasoning, needsVision) {
+  return FREE_MODELS
+    .filter(f => !needsVision || f.vision)
+    .map(f => ({ model: f.model, reasoning: reasoning || DEFAULT_REASONING, free: true }));
+}
+
 /**
- * Detects the specific task type key for profile-based model resolution.
+ * Picks the profile slot for one part of the question. Image questions and
+ * mixed questions (choices + text fields) use their own slots.
+ * @param {'choice'|'matching'|'text'} part
  */
-function detectTaskType(formData) {
-  const hasImages = formData.question && formData.question.images && formData.question.images.length > 0;
-  if (hasImages) return 'image';
-  if (formData.type === 'matching') return 'matching';
-  if (formData.type === 'text_input') return 'text_input';
+function taskTypeFor(formData, part) {
+  if (formData.imageData && formData.imageData.length) return 'image';
   if (formData.type === 'mixed') return 'mixed';
-  if (formData.isMultiple) return 'radio_multiple';
-  return 'radio_single';
+  if (part === 'matching') return 'matching';
+  if (part === 'text') return 'text_input';
+  return formData.isMultiple ? 'radio_multiple' : 'radio_single';
+}
+
+// ─── Images ──────────────────────────────────────────────────────────────────
+// The model can't open ELIT image URLs itself (they need the student's session),
+// so images are downloaded here and sent inline as data URLs.
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function loadImageAsDataUrl(url) {
+  if (url.startsWith('data:image/')) return url;
+  try {
+    const res = await fetch(url, { credentials: 'include' });
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    if (!blob.type.startsWith('image/') || blob.size > MAX_IMAGE_BYTES) return null;
+    return await blobToDataUrl(blob);
+  } catch (_) {
+    return null;
+  }
+}
+
+/** Question images + images inside answer options, as data URLs (unreadable ones are skipped). */
+async function collectImageData(formData) {
+  const urls = [...(formData.question?.images || [])];
+  formData.choices.forEach(c => {
+    for (const m of c.text.matchAll(/\[image: ([^\]]+)\]/g)) urls.push(m[1]);
+  });
+  const unique = [...new Set(urls)].slice(0, MAX_IMAGES);
+  const loaded = await Promise.all(unique.map(loadImageAsDataUrl));
+  return loaded.filter(Boolean);
+}
+
+function buildUserContent(text, imageData) {
+  if (!imageData || !imageData.length) return text;
+  return [
+    { type: 'text', text },
+    ...imageData.map(url => ({ type: 'image_url', image_url: { url } })),
+  ];
 }
 
 // ─── OpenRouter API Call — Generic ──────────────────────────────────────────
@@ -439,7 +495,7 @@ async function callOpenRouterGeneric(systemPrompt, userPrompt, retryNum = 0, mod
     return { error: 'API key not set. Open the extension popup.', fatal: true };
   }
 
-  const usedModel = (modelConfig && modelConfig.model) || DEFAULT_MODEL;
+  const usedModel = (modelConfig && modelConfig.model) || DEFAULT_MODEL_ID;
   const effort = (modelConfig && modelConfig.reasoning) || DEFAULT_REASONING;
 
   // Escalating temperature on retries for diversity
@@ -497,7 +553,9 @@ async function callOpenRouterGeneric(systemPrompt, userPrompt, retryNum = 0, mod
       const err = await response.json().catch(() => ({}));
       const msg = err?.error?.message || `HTTP ${response.status}`;
       if (debugMode) console.error('[AI ELIT] API Error:', err);
-      return { error: `API Error: ${msg}`, fatal: response.status === 401 };
+      // 401 = bad key: every other model would fail the same way.
+      // 402 = no credits: runWithFallback switches to free models.
+      return { error: `API Error: ${msg}`, fatal: response.status === 401, noCredits: response.status === 402 };
     }
 
     const data = await response.json();
@@ -519,7 +577,7 @@ async function callOpenRouterGeneric(systemPrompt, userPrompt, retryNum = 0, mod
 
   } catch (err) {
     clearTimeout(timeoutId);
-    const msg = err.name === 'AbortError' ? 'Request timed out (60s)' : err.message;
+    const msg = err.name === 'AbortError' ? `Request timed out (${FETCH_TIMEOUT_MS / 1000}s)` : err.message;
     return { error: `Network error: ${msg}` };
   }
 }
@@ -534,10 +592,12 @@ const shortModelName = id => String(id).split('/').pop();
  */
 async function runWithFallback(taskLabel, systemPrompt, userPrompt, modelChain, extract) {
   let lastError = '';
+  let chain = [...modelChain];
+  const needsVision = Array.isArray(userPrompt); // images attached
 
-  for (let m = 0; m < modelChain.length; m++) {
-    const mc = modelChain[m];
-    const next = modelChain[m + 1];
+  for (let m = 0; m < chain.length; m++) {
+    const mc = chain[m];
+    let silentSwitch = false;
 
     for (let attempt = 0; attempt <= RETRY_COUNT; attempt++) {
       const res = await callOpenRouterGeneric(systemPrompt, userPrompt, attempt, mc);
@@ -545,7 +605,17 @@ async function runWithFallback(taskLabel, systemPrompt, userPrompt, modelChain, 
       if (res.error) {
         lastError = res.error;
         console.warn(`[AI ELIT] ${mc.model}: ${res.error}`);
-        if (res.fatal) {
+
+        if (res.noCredits && !mc.free) {
+          // Out of credits: quietly continue with the free models instead of the paid fallbacks
+          console.warn('[AI ELIT] No OpenRouter credits left, switching to free models');
+          try { chrome.storage.local.set({ noCreditsAt: Date.now() }); } catch (_) { }
+          chain = [...chain.slice(0, m + 1), ...freeModelChain(mc.reasoning, needsVision)];
+          silentSwitch = true;
+          break;
+        }
+        if (res.fatal || res.noCredits) {
+          // Bad key, or even free models are refused (negative balance)
           showToast(`❌ ${res.error}`, 'error');
           return null;
         }
@@ -563,12 +633,13 @@ async function runWithFallback(taskLabel, systemPrompt, userPrompt, modelChain, 
       if (attempt < RETRY_COUNT) showToast('⟳ Retrying with different parameters…', 'info');
     }
 
-    if (next) {
-      showToast(`↪ ${shortModelName(mc.model)} failed (${lastError}). Trying ${shortModelName(next.model)}…`, 'error');
+    const next = chain[m + 1];
+    if (next && !silentSwitch) {
+      showToast(`↪ ${shortModelName(mc.model)} failed (${lastError}). Trying ${shortModelName(next.model)}…`, 'info');
     }
   }
 
-  const tried = modelChain.length > 1 ? ` (tried ${modelChain.length} models)` : '';
+  const tried = chain.length > 1 ? ` (tried ${chain.length} models)` : '';
   showToast(`❌ ${taskLabel}: ${lastError}${tried}. Check console.`, 'error');
   return null;
 }
@@ -596,8 +667,12 @@ async function solveRadioCheckbox(formData, modelChain) {
   const optionsList = choices.map((c, i) => `  [${i}] ${c.text}`).join('\n');
 
   const selectionMode = isMultiple
-    ? 'MULTIPLE CORRECT ANSWERS are possible — select ALL that apply.'
+    ? 'Checkboxes: ANY number of options can be correct, including all of them or none of them. Select ALL that apply.'
     : 'Only ONE answer is correct.';
+
+  const emptyRule = isMultiple
+    ? `6. Judge every option on its own. If, after checking each option, none of them is correct, return an empty array: "answer": []. This is a valid answer for checkbox questions (all boxes stay unchecked), so do not pick an option just to avoid an empty answer. The supplied context may be incomplete or ambiguous; infer the most likely intent from the options, field labels, and context.`
+    : `6. Return exactly one index, never an empty array. The supplied context may be incomplete or ambiguous; infer the most likely intent from the options, field labels, and context. If no option is fully correct, choose the most plausible one.`;
 
   const systemPrompt = `${COMMON_SOLVER_PROMPT}
 
@@ -612,7 +687,7 @@ Rules:
 3. If multiple correct answers are possible, return all correct indices in ascending order.
 4. Select options based on their actual meaning, not merely keyword similarity.
 5. The justification must agree with the selected indices.
-6. The supplied context may be incomplete or ambiguous. Infer the most likely intent from the options, field labels, and context, and still select the best answer. If no option is fully correct, choose the most plausible one. Never return an empty "answer" array; an answer is always required.
+${emptyRule}
 7. Include only the keys "reasoning" and "answer".`;
 
   const userPrompt = `Question:
@@ -626,12 +701,19 @@ ${selectionMode}
 
 Return the required JSON object with the selected indices and a concise justification.`;
 
-  return runWithFallback('Choice', systemPrompt, userPrompt, modelChain, parsed => {
-    // New format: {"reasoning": "...", "answer": [0, 2]}
-    if (parsed && parsed.answer && Array.isArray(parsed.answer)) return parsed.answer;
-    // Legacy format: plain array [0, 2]
-    if (parsed && Array.isArray(parsed)) return parsed;
-    return null;
+  return runWithFallback('Choice', systemPrompt, buildUserContent(userPrompt, formData.imageData), modelChain, parsed => {
+    // New format: {"reasoning": "...", "answer": [0, 2]}; legacy format: plain array [0, 2]
+    const answer = Array.isArray(parsed?.answer) ? parsed.answer : (Array.isArray(parsed) ? parsed : null);
+    if (!answer) return null;
+    // Models sometimes return "1" instead of 1
+    const indices = [...new Set(answer.map(Number))];
+    // Any index that isn't a real option means the model misread the list: retry instead of
+    // dropping it (dropping could turn [7] into [] = "nothing is correct")
+    if (indices.some(i => !Number.isInteger(i) || i < 0 || i >= choices.length)) return null;
+    if (isMultiple) return indices.sort((a, b) => a - b); // [] is valid: no option is correct
+    if (indices.length === 0) return null;                 // radio: exactly one is always correct
+    if (indices.length > 1) console.warn('[AI ELIT] Radio question got several indices, using the first:', indices);
+    return [indices[0]];
   });
 }
 
@@ -716,8 +798,8 @@ ${promptBody}
 
 Return the required JSON object with exact option text and a concise justification.`;
 
-  return runWithFallback('Matching', systemPrompt, userPrompt, modelChain, parsed =>
-    (parsed && parsed.matches && typeof parsed.matches === 'object') ? parsed : null
+  return runWithFallback('Matching', systemPrompt, buildUserContent(userPrompt, formData.imageData), modelChain, parsed =>
+    (parsed && parsed.matches && typeof parsed.matches === 'object' && Object.keys(parsed.matches).length) ? parsed : null
   );
 }
 
@@ -765,8 +847,8 @@ ${fields}
 
 Return the required JSON object with answers in field order and a concise justification.`;
 
-  return runWithFallback('Text input', systemPrompt, userPrompt, modelChain, parsed => {
-    if (!parsed || !parsed.text_answers || !Array.isArray(parsed.text_answers)) return null;
+  return runWithFallback('Text input', systemPrompt, buildUserContent(userPrompt, formData.imageData), modelChain, parsed => {
+    if (!parsed || !Array.isArray(parsed.text_answers) || !parsed.text_answers.length) return null;
     // Models still slip in long dashes sometimes; swap them for a plain hyphen.
     parsed.text_answers = parsed.text_answers.map(a =>
       typeof a === 'string' ? a.replace(/[–—]/g, '-') : a
@@ -788,7 +870,14 @@ function normalizeForMatch(s) {
 
 function applyRadioCheckbox(choices, indices) {
   if (!indices || !Array.isArray(indices)) return 0;
-  choices.forEach(c => { if (c.el) c.el.checked = false; });
+  // Clear previous selections; tell the page about every box that actually changed,
+  // so an empty answer ("nothing is correct") is registered too
+  choices.forEach(c => {
+    if (c.el && c.el.checked && !indices.includes(c.idx)) {
+      c.el.checked = false;
+      c.el.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  });
 
   let applied = 0;
   indices.forEach(idx => {
@@ -908,13 +997,31 @@ function applyTextInputs(formData, result) {
 
 // ─── Toast Notification ───────────────────────────────────────────────────────
 
-async function showToast(message, type = 'info') {
+/** Status for the toolbar badge + popup banner (drawn by background.js, not on the page). */
+function reportStatus(state, text, badge = '') {
   try {
-    // When button is hidden, suppress non-error toasts (selected answer info)
-    if (type !== 'error') {
-      const { hideButton } = await getStorage(['hideButton']);
-      if (hideButton) return;
-    }
+    chrome.runtime.sendMessage({ type: 'aqs-status', state, text, badge }, () => void chrome.runtime.lastError);
+  } catch (_) { /* extension was reloaded; nothing to report to */ }
+}
+
+/**
+ * Badge text for a choice answer: 1-based option numbers, e.g. [0,2,3] → "134".
+ * The badge fits ~4 characters; the full answer is in the tooltip and the popup.
+ */
+function answerBadge(indices) {
+  if (!indices.length) return '0'; // checkbox question, nothing is correct
+  const nums = indices.map(i => i + 1);
+  const text = nums.every(n => n < 10) ? nums.join('') : nums.join(',');
+  return text.length <= 4 ? text : text.slice(0, 3) + '+';
+}
+
+async function showToast(message, type = 'info', badge = '') {
+  reportStatus(type, message, badge);
+  try {
+    // Hidden button = stealth mode: nothing at all is drawn on the page,
+    // errors included. The badge on the extension icon and the popup banner show it instead.
+    const { hideButton } = await getStorage(['hideButton']);
+    if (hideButton) return;
 
     const existing = document.getElementById('aqs-toast');
     if (existing) existing.remove();
@@ -1043,6 +1150,55 @@ function injectStyles() {
   document.head.appendChild(style);
 }
 
+// ─── Quiz Page Detection ──────────────────────────────────────────────────────
+// The extension only solves test questions, so the button must not appear on
+// login pages, assignment-submission pages, etc.
+
+const QUIZ_NAV_RE = /наступн\S*\s+питанн|попередн\S*\s+питанн|next\s+question/i;
+
+function findQuizNavLink(form) {
+  return Array.from(form.querySelectorAll('a, button, input[type="submit"], input[type="button"]'))
+    .find(el => QUIZ_NAV_RE.test(el.textContent || el.value || '')) || null;
+}
+
+function isVisible(el) {
+  return !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
+}
+
+function hasAnswerInputs(form) {
+  const inputs = form.querySelectorAll(
+    'input[type="radio"], input[type="checkbox"], select, textarea, input[type="text"], input:not([type])'
+  );
+  return Array.from(inputs).some(el => {
+    if (el.disabled || el.readOnly) return false;
+    if (el.tagName === 'SELECT' && el.options.length < 2) return false;
+    // Native radios/checkboxes are often visually hidden behind custom styling
+    if (el.type === 'radio' || el.type === 'checkbox') return true;
+    return isVisible(el);
+  });
+}
+
+function isQuizForm(form) {
+  if (!form) return false;
+  // Login / registration / upload forms are never quizzes
+  if (form.querySelector('input[type="password"], input[type="file"]')) return false;
+  if (!hasAnswerInputs(form)) return false;
+  return true;
+}
+
+/** Returns the quiz question form on the current page, or null. */
+function findQuizForm() {
+  const forms = Array.from(document.forms);
+  const byId = document.getElementById('form');
+  if (byId && byId.tagName === 'FORM' && !forms.includes(byId)) forms.unshift(byId);
+  const candidates = forms.filter(isQuizForm);
+  if (!candidates.length) return null;
+  // Prefer the form with the "next question" navigation, then #form
+  return candidates.find(findQuizNavLink)
+    || candidates.find(f => f.id === 'form')
+    || candidates[0];
+}
+
 // ─── Main Solve Logic ─────────────────────────────────────────────────────────
 
 let isSolving = false;
@@ -1053,9 +1209,9 @@ async function solveCurrentForm() {
     return;
   }
 
-  const form = document.getElementById('form') || document.querySelector('form');
+  const form = findQuizForm();
   if (!form) {
-    showToast('⚠️ No form found on this page.', 'error');
+    showToast('⚠️ No test question found on this page.', 'error');
     return;
   }
 
@@ -1071,56 +1227,77 @@ async function solveCurrentForm() {
 
   isSolving = true;
   setButtonLoading(btn, true);
+  reportStatus('working', 'Solving…');
 
   try {
-    let totalApplied = 0;
+    let solvedParts = 0;
     const results = [];
+    let badge = '';
+
+    // Auto-fill switches (popup → Main). Off = only show the answer.
+    const { autoFill, autoFillOther } = await getStorage(['autoFill', 'autoFillOther']);
+    const fillChoices = autoFill !== false;
+    const fillOther = fillChoices && autoFillOther !== false; // sub-switch only works under the main one
+
+    // Download question/option images so the model can actually see them
+    formData.imageData = await collectImageData(formData);
 
     // ── Handle radio/checkbox ──
-    if (formData.choices.length > 0 && formData.type !== 'matching') {
-      const taskType = formData.isMultiple ? 'radio_multiple' : 'radio_single';
-      // Override task type if question has images
-      const effectiveType = (formData.question?.images?.length > 0) ? 'image' : taskType;
-      const chain = await resolveModelChain(effectiveType);
+    if (formData.choices.length > 0 && !formData.radioMatching) {
+      const chain = await resolveModelChain(taskTypeFor(formData, 'choice'));
       const indices = await solveRadioCheckbox(formData, chain);
       if (indices !== null) {
-        const applied = applyRadioCheckbox(formData.choices, indices);
-        totalApplied += applied;
-        const labels = indices
-          .filter(i => i >= 0 && i < formData.choices.length)
-          .map(i => `"${formData.choices[i].text.slice(0, 40)}"`)
-          .join(', ');
-        results.push(applied ? `✅ Selected: ${labels}` : `⚠️ Out-of-range indices: [${indices}]`);
+        solvedParts++;
+        if (fillChoices) applyRadioCheckbox(formData.choices, indices);
+        badge = answerBadge(indices);
+        const nums = indices.map(i => i + 1).join(', ');
+        if (indices.length === 0) {
+          // Valid for checkbox questions: the model decided no option is correct
+          results.push(fillChoices
+            ? '✅ None of the options is correct — all left unchecked'
+            : '💡 None of the options is correct — leave all unchecked');
+        } else {
+          const labels = indices.map(i => `"${formData.choices[i].text.slice(0, 40)}"`).join(', ');
+          results.push(fillChoices ? `✅ Selected ${nums}: ${labels}` : `💡 Answer ${nums}: ${labels}`);
+        }
       }
     }
 
     // ── Handle matching ──
     if (formData.type === 'matching') {
-      const effectiveType = (formData.question?.images?.length > 0) ? 'image' : 'matching';
-      const chain = await resolveModelChain(effectiveType);
+      const chain = await resolveModelChain(taskTypeFor(formData, 'matching'));
       const matchResult = await solveMatching(formData, chain);
       if (matchResult !== null) {
-        const applied = applyMatching(formData, matchResult);
-        totalApplied += applied;
-        results.push(applied ? `✅ Matched ${applied} items` : '⚠️ No matches applied');
+        solvedParts++;
+        if (fillOther) {
+          const applied = applyMatching(formData, matchResult);
+          results.push(applied ? `✅ Matched ${applied} items` : '⚠️ No matches applied');
+        } else {
+          const list = Object.entries(matchResult.matches).map(([k, v]) => `${k} → ${v}`).join('; ');
+          results.push(`💡 ${list}`);
+        }
       }
     }
 
     // ── Handle text inputs ──
     if (formData.textInputs.length > 0) {
-      const effectiveType = (formData.question?.images?.length > 0) ? 'image' : 'text_input';
-      const chain = await resolveModelChain(effectiveType);
+      const chain = await resolveModelChain(taskTypeFor(formData, 'text'));
       const textResult = await solveTextInput(formData, chain);
       if (textResult !== null) {
-        const applied = applyTextInputs(formData, textResult);
-        totalApplied += applied;
-        results.push(applied ? `✅ Filled ${applied} text fields` : '⚠️ No text fields filled');
+        solvedParts++;
+        if (fillOther) {
+          const applied = applyTextInputs(formData, textResult);
+          results.push(applied ? `✅ Filled ${applied} text fields` : '⚠️ No text fields filled');
+        } else {
+          const list = textResult.text_answers.map((t, i) => `[${i + 1}] ${t}`).join('; ');
+          results.push(`💡 ${list}`);
+        }
       }
     }
 
-    // Show combined result
+    // Show combined result (badge: correct option numbers for choice questions)
     if (results.length) {
-      showToast(results.join(' | '), totalApplied > 0 ? 'success' : 'error');
+      showToast(results.join(' | '), solvedParts > 0 ? 'success' : 'error', badge);
     }
 
   } catch (err) {
@@ -1142,9 +1319,8 @@ async function injectButton(form) {
 
   const aiBtn = createAIButton();
 
-  // Find the navigation link by text content
-  const links = Array.from(form.querySelectorAll('a'));
-  const nextLink = links.find(a => /наступного питання|наступне питання|next/i.test(a.textContent));
+  // Place the button right after the "next question" navigation link
+  const nextLink = findQuizNavLink(form);
 
   if (nextLink && nextLink.parentNode) {
     nextLink.parentNode.insertBefore(aiBtn, nextLink.nextSibling);
@@ -1189,6 +1365,8 @@ document.addEventListener('keydown', (e) => {
   if (e.target.isContentEditable) return;
 
   if (e.key === '\\') {
+    // Only hijack the key on test pages
+    if (!findQuizForm()) return;
     e.preventDefault();
     solveCurrentForm();
   }
@@ -1203,7 +1381,12 @@ function watchForForm() {
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
       try {
-        const form = document.getElementById('form') || document.querySelector('form');
+        const form = findQuizForm();
+        const existing = document.getElementById('aqs-btn');
+        if (existing && (!form || !form.contains(existing))) {
+          // Page changed (SPA navigation) and the button is no longer on a quiz form
+          existing.remove();
+        }
         if (form && !document.getElementById('aqs-btn')) {
           injectButton(form);
         }
