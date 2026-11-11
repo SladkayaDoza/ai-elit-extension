@@ -511,7 +511,8 @@ async function callOpenRouterGeneric(systemPrompt, userPrompt, retryNum = 0, mod
     ],
     temperature,
     max_tokens: MAX_TOKENS,
-    response_format: { type: 'json_object' }
+    response_format: { type: 'json_object' },
+    usage: { include: true } // OpenRouter returns tokens + cost for the statistics tab
   };
 
   // Add reasoning if not "none"
@@ -553,6 +554,7 @@ async function callOpenRouterGeneric(systemPrompt, userPrompt, retryNum = 0, mod
       const err = await response.json().catch(() => ({}));
       const msg = err?.error?.message || `HTTP ${response.status}`;
       if (debugMode) console.error('[AI ELIT] API Error:', err);
+      reportUsage({ model: usedModel, ok: false });
       // 401 = bad key: every other model would fail the same way.
       // 402 = no credits: runWithFallback switches to free models.
       return { error: `API Error: ${msg}`, fatal: response.status === 401, noCredits: response.status === 402 };
@@ -560,6 +562,16 @@ async function callOpenRouterGeneric(systemPrompt, userPrompt, retryNum = 0, mod
 
     const data = await response.json();
     const raw = data?.choices?.[0]?.message?.content?.trim();
+
+    const u = data?.usage || {};
+    reportUsage({
+      model: usedModel,
+      ok: !data?.error && !!raw,
+      prompt: u.prompt_tokens || 0,
+      completion: u.completion_tokens || 0,
+      reasoning: u.completion_tokens_details?.reasoning_tokens || 0,
+      cost: typeof u.cost === 'number' ? u.cost : 0,
+    });
 
     if (debugMode) {
       console.group(`[AI ELIT] API Response (attempt ${retryNum + 1})`);
@@ -997,6 +1009,13 @@ function applyTextInputs(formData, result) {
 
 // ─── Toast Notification ───────────────────────────────────────────────────────
 
+/** Tokens/cost of one API request → usage statistics (aggregated by background.js). */
+function reportUsage(entry) {
+  try {
+    chrome.runtime.sendMessage({ type: 'aqs-usage', entry }, () => void chrome.runtime.lastError);
+  } catch (_) { /* extension was reloaded */ }
+}
+
 /** Status for the toolbar badge + popup banner (drawn by background.js, not on the page). */
 function reportStatus(state, text, badge = '') {
   try {
@@ -1026,12 +1045,8 @@ async function showToast(message, type = 'info', badge = '') {
     const existing = document.getElementById('aqs-toast');
     if (existing) existing.remove();
 
-    const colors = {
-      info: { bg: '#1b1b1e', border: '#3c3c41', text: '#f5f4f0' },
-      success: { bg: '#1b1b1e', border: '#d7a35f', text: '#d7a35f' },
-      error: { bg: '#221a1a', border: '#e07a7a', text: '#e8a0a0' }
-    };
-    const c = colors[type] || colors.info;
+    // Same look as the popup: flat dark panel, hairline border, colored stripe on the left
+    const stripe = { info: '#74716a', success: '#e3a557', error: '#e8705f' }[type] || '#74716a';
 
     const toast = document.createElement('div');
     toast.id = 'aqs-toast';
@@ -1041,25 +1056,28 @@ async function showToast(message, type = 'info', badge = '') {
       bottom: '24px',
       right: '24px',
       zIndex: '999999',
-      padding: '12px 18px',
-      borderRadius: '8px',
-      border: `1px solid ${c.border}`,
-      background: c.bg,
-      color: c.text,
-      fontSize: '12px',
-      fontFamily: "ui-monospace, 'Cascadia Mono', Consolas, monospace",
+      padding: '10px 14px',
+      borderRadius: '4px',
+      border: '1px solid #36363d',
+      borderLeft: `3px solid ${stripe}`,
+      background: '#19191c',
+      color: '#ebe9e4',
+      fontSize: '12.5px',
+      fontFamily: "system-ui, 'Segoe UI', sans-serif",
       fontWeight: '500',
-      boxShadow: '0 8px 24px rgba(0,0,0,0.45)',
+      boxShadow: '0 10px 28px rgba(0,0,0,0.4)',
       maxWidth: 'min(420px, calc(100vw - 32px))',
-      lineHeight: '1.5',
-      transition: 'opacity 0.4s',
-      opacity: '1'
+      lineHeight: '1.45',
+      transform: 'translateY(8px)',
+      transition: 'opacity 0.3s, transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
+      opacity: '0'
     });
 
     document.body.appendChild(toast);
+    requestAnimationFrame(() => { toast.style.opacity = '1'; toast.style.transform = 'none'; });
     setTimeout(() => {
       toast.style.opacity = '0';
-      setTimeout(() => { try { toast.remove(); } catch (_) { } }, 400);
+      setTimeout(() => { try { toast.remove(); } catch (_) { } }, 300);
     }, 4000);
   } catch (_) {
     // Never let toast crash the main flow

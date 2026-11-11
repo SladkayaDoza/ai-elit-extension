@@ -57,7 +57,40 @@ const POPUPS = {
   profiles: { tab: 'profiles', profile: 'Pro', data: base },
   fallback: { tab: 'fallback', data: base },
   models: { tab: 'models', data: base },
+  usage: { tab: 'usage', data: { ...base, usageStats: demoStats() } },
 };
+
+// Plausible two weeks of usage for the Usage tab screenshot
+function demoStats() {
+  const day = t => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  const pattern = [0.21, 0.0, 0.34, 0.12, 0.0, 0.0, 0.48, 0.27, 0.09, 0.0, 0.61, 0.33, 0.18, 0.42];
+  const days = {};
+  let cost = 0, questions = 0, requests = 0;
+  pattern.forEach((c, i) => {
+    if (!c) return;
+    const q = Math.round(c * 55), r = q + Math.round(q * 0.15);
+    days[day(Date.now() - (13 - i) * 864e5)] = { cost: c, questions: q, requests: r, prompt: r * 1900, completion: r * 640, reasoning: r * 380 };
+    cost += c; questions += q; requests += r;
+  });
+  const now = Date.now();
+  return {
+    since: now - 13 * 864e5,
+    total: { cost, questions, requests, failed: 6, prompt: requests * 1900, completion: requests * 640, reasoning: requests * 380 },
+    days,
+    models: {
+      'anthropic/claude-sonnet-5.5': { cost: cost * 0.52, requests: Math.round(requests * 0.7), prompt: requests * 1300, completion: requests * 420, failed: 2 },
+      'anthropic/claude-fable-5.2': { cost: cost * 0.31, requests: Math.round(requests * 0.12), prompt: requests * 300, completion: requests * 120 },
+      'anthropic/claude-opus-5.5': { cost: cost * 0.17, requests: Math.round(requests * 0.1), prompt: requests * 250, completion: requests * 90, failed: 1 },
+      'nvidia/nemotron-3-ultra-550b-a55b:free': { cost: 0, requests: Math.round(requests * 0.08), prompt: requests * 50, completion: requests * 10, failed: 3 },
+    },
+    recent: [
+      { t: now - 4 * 6e4, model: 'anthropic/claude-sonnet-5.5', ok: true, prompt: 1840, completion: 512, cost: 0.0088 },
+      { t: now - 6 * 6e4, model: 'anthropic/claude-fable-5.2', ok: true, prompt: 2410, completion: 905, cost: 0.0555 },
+      { t: now - 9 * 6e4, model: 'anthropic/claude-sonnet-5.5', ok: false, prompt: 0, completion: 0, cost: 0 },
+      { t: now - 12 * 6e4, model: 'anthropic/claude-sonnet-5.5', ok: true, prompt: 1702, completion: 455, cost: 0.0079 },
+    ],
+  };
+}
 
 fs.rmSync(BUILD, { recursive: true, force: true });
 fs.mkdirSync(BUILD, { recursive: true });
@@ -69,12 +102,12 @@ for (const [name, cfg] of Object.entries(POPUPS)) {
   const data = { ...cfg.data };
   if (data.lastStatus) data.lastStatus = { ...data.lastStatus, time: Date.now() };
   // No transitions: the screenshot must show the final tab highlight, not a mid-animation frame
-  const mock = `<style>html{background:#101012}body{max-height:none!important;overflow:hidden!important}*,*::before,*::after{transition:none!important}</style>
+  const mock = `<style>*,*::before,*::after{transition:none!important}</style>
 <script>
 const DATA = ${JSON.stringify(data)};
 const copy = o => JSON.parse(JSON.stringify(o));
 window.chrome = {
-  runtime: { lastError: null, sendMessage() {} },
+  runtime: { lastError: null, sendMessage() {}, getManifest: () => ({ version: "1.5.0" }) },
   storage: {
     local: {
       get(keys, cb) {
@@ -98,13 +131,16 @@ setTimeout(() => {
 }, 400);
 </script>`;
   const html = popupHtml
+    .replace('href="popup.css"', `href="${rel}/popup.css"`)
     .replace('<script src="models.js"></script>', `${mock}\n  <script src="${rel}/models.js"></script>`)
     .replace('<script src="popup.js"></script>', `<script src="${rel}/popup.js"></script>\n${after}`);
   const file = path.join(BUILD, `popup-${name}.html`);
   fs.writeFileSync(file, html);
-  screenshot(file, path.join(BUILD, `popup-${name}.png`), 400, 760, 2);
+  screenshot(file, path.join(BUILD, `popup-${name}.png`), 400, 584, 2);
   console.log(`  popup     ${name}`);
 }
+
+if (process.env.PREVIEW) { fs.rmSync(PROFILE_DIR, { recursive: true, force: true }); process.exit(0); }
 
 // ── 2. Store images ─────────────────────────────────────────────────────────
 const IMAGES = [

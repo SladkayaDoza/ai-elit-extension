@@ -1,1023 +1,348 @@
 <!DOCTYPE html>
-<html lang="uk">
+<html lang="en">
 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI ELIT Solver</title>
-  <style>
-    :root {
-      --bg: #101012;
-      --surface: #161618;
-      --raised: #1c1c1f;
-      --border: #2a2a2e;
-      --border-soft: #232327;
-      --border-strong: #3c3c41;
-      --text: #f5f4f0;
-      --text-dim: #d3d0c9;
-      --text-faint: #a5a198;
-      --accent: #d7a35f;
-      --accent-soft: rgba(215, 163, 95, 0.12);
-      --error: #e07a7a;
-    }
-
-    *,
-    *::before,
-    *::after {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      width: 400px;
-      min-height: 520px;
-      max-height: 600px;
-      overflow-y: auto;
-      background: var(--bg);
-      color: var(--text);
-      font-family: ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Consolas, monospace;
-      font-size: 12px;
-      line-height: 1.55;
-      padding: 16px;
-    }
-
-    /* ─── Header ─── */
-    .header {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 16px;
-      border-bottom: 1px dashed var(--border);
-      padding-bottom: 12px;
-    }
-
-    .logo {
-      font-size: 18px;
-      line-height: 1;
-      color: var(--accent);
-    }
-
-    .header-text h1 {
-      font-size: 13px;
-      font-weight: 700;
-      color: var(--text);
-      letter-spacing: 0.02em;
-    }
-
-    .header-text p {
-      font-size: 10px;
-      color: var(--text-faint);
-      margin-top: 1px;
-    }
-
-    .header-right {
-      margin-left: auto;
-    }
-
-    .gear-btn {
-      background: none;
-      border: 1px dashed var(--border);
-      border-radius: 6px;
-      color: var(--text-faint);
-      font-size: 14px;
-      cursor: pointer;
-      padding: 5px 9px;
-      transition: color 0.15s, border-color 0.15s;
-      line-height: 1;
-      font-family: inherit;
-    }
-
-    .gear-btn:hover {
-      color: var(--accent);
-      border-color: var(--accent);
-    }
-
-    /* ─── Tabs ─── */
-    .tabs {
-      display: flex;
-      gap: 4px;
-      margin-bottom: 16px;
-      border-bottom: 1px dashed var(--border);
-    }
-
-    .tab-btn {
-      padding: 7px 10px;
-      background: transparent;
-      border: none;
-      border-bottom: 1px solid transparent;
-      margin-bottom: -1px;
-      color: var(--text-faint);
-      font-size: 11px;
-      font-weight: 600;
-      font-family: inherit;
-      cursor: pointer;
-      transition: color 0.15s, border-color 0.15s;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-
-    .tab-btn:hover {
-      color: var(--text-dim);
-    }
-
-    .tab-btn.active {
-      color: var(--accent);
-      border-bottom: 1px solid var(--accent);
-    }
-
-    .tab-content {
-      display: none;
-    }
-
-    .tab-content.active {
-      display: block;
-    }
-
-    /* ─── Form fields ─── */
-    .field {
-      margin-bottom: 14px;
-    }
-
-    label {
-      display: block;
-      font-size: 10px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text-faint);
-      margin-bottom: 5px;
-    }
-
-    input,
-    select {
-      width: 100%;
-      padding: 7px 10px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      color: var(--text);
-      font-size: 12px;
-      font-family: inherit;
-      outline: none;
-      transition: border-color 0.15s;
-    }
-
-    input:focus,
-    select:focus {
-      border-color: var(--accent);
-    }
-
-    input::placeholder {
-      color: #8f8b83;
-    }
-
-    input[type="password"] {
-      letter-spacing: 0.1em;
-    }
-
-    select option {
-      background: var(--surface);
-      color: var(--text);
-    }
-
-    .toggle-key {
-      position: relative;
-    }
-
-    .toggle-key input {
-      padding-right: 34px;
-    }
-
-    .eye-btn {
-      position: absolute;
-      right: 10px;
-      top: 50%;
-      transform: translateY(-50%);
-      background: none;
-      border: none;
-      cursor: pointer;
-      color: var(--text-faint);
-      font-size: 13px;
-      padding: 0;
-      line-height: 1;
-      transition: color 0.15s;
-    }
-
-    .eye-btn:hover {
-      color: var(--text);
-    }
-
-    .hint {
-      font-size: 10px;
-      color: var(--text-faint);
-      margin-top: 6px;
-      line-height: 1.5;
-    }
-
-    .hint a {
-      color: var(--accent);
-      text-decoration: none;
-      border-bottom: 1px dashed var(--accent);
-    }
-
-    .hint a:hover {
-      color: var(--text);
-      border-bottom-color: var(--text);
-    }
-
-    /* ─── Toggle switch ─── */
-    .toggle-field {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      margin-top: 10px;
-      margin-bottom: 4px;
-      padding: 9px 12px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-    }
-
-    .toggle-field label {
-      margin-bottom: 0;
-      font-size: 11px;
-      text-transform: none;
-      letter-spacing: 0;
-      color: var(--text-dim);
-    }
-
-    .toggle-switch {
-      position: relative;
-      width: 36px;
-      height: 20px;
-      flex-shrink: 0;
-    }
-
-    .toggle-switch input {
-      opacity: 0;
-      width: 0;
-      height: 0;
-      position: absolute;
-    }
-
-    .slider {
-      position: absolute;
-      inset: 0;
-      background: var(--border);
-      border-radius: 20px;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-
-    .slider::before {
-      content: '';
-      position: absolute;
-      left: 3px;
-      top: 3px;
-      width: 14px;
-      height: 14px;
-      background: var(--text-faint);
-      border-radius: 50%;
-      transition: transform 0.2s, background 0.2s;
-    }
-
-    .toggle-switch input:checked+.slider {
-      background: var(--accent-soft);
-    }
-
-    .toggle-switch input:checked+.slider::before {
-      transform: translateX(16px);
-      background: var(--accent);
-    }
-
-    .toggle-hint {
-      font-size: 10px;
-      color: var(--text-faint);
-      text-align: center;
-      margin-top: 2px;
-      margin-bottom: 8px;
-      line-height: 1.4;
-    }
-
-    /* Sub-switch: indented under its parent with a └ connector, greyed out while the parent is off */
-    .sub-toggle {
-      margin-left: 20px;
-    }
-
-    .toggle-field.sub-toggle {
-      position: relative;
-      margin-top: 0;
-    }
-
-    .toggle-field.sub-toggle::before {
-      content: '';
-      position: absolute;
-      left: -13px;
-      top: -10px;
-      width: 12px;
-      height: calc(50% + 10px);
-      border-left: 2px solid var(--border-strong);
-      border-bottom: 2px solid var(--border-strong);
-      border-bottom-left-radius: 6px;
-      pointer-events: none;
-    }
-
-    .sub-toggle.disabled {
-      opacity: 0.45;
-    }
-
-    .sub-toggle.disabled .slider {
-      cursor: not-allowed;
-    }
-
-    /* ─── Buttons ─── */
-    .save-btn {
-      width: 100%;
-      padding: 8px;
-      background: var(--accent);
-      color: #17130d;
-      border: 1px solid var(--accent);
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      cursor: pointer;
-      margin-top: 4px;
-      transition: filter 0.15s;
-      font-family: inherit;
-    }
-
-    .save-btn:hover {
-      filter: brightness(1.1);
-    }
-
-    .btn-sm {
-      padding: 6px 12px;
-      background: transparent;
-      color: var(--text-dim);
-      border: 1px dashed var(--border-strong);
-      border-radius: 6px;
-      font-size: 11px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: color 0.15s, border-color 0.15s, background 0.15s;
-      font-family: inherit;
-    }
-
-    .btn-sm:hover {
-      color: var(--accent);
-      border-color: var(--accent);
-      background: var(--accent-soft);
-    }
-
-    .btn-sm.danger {
-      color: var(--error);
-    }
-
-    .btn-sm.danger:hover {
-      border-color: var(--error);
-      background: rgba(224, 122, 122, 0.08);
-    }
-
-    .status {
-      text-align: center;
-      font-size: 11px;
-      margin-top: 10px;
-      padding-top: 8px;
-      border-top: 1px dashed var(--border-soft);
-      min-height: 26px;
-      color: var(--accent);
-      transition: opacity 0.3s;
-    }
-
-    .status:empty {
-      border-top-color: transparent;
-    }
-
-    .status.error {
-      color: var(--error);
-    }
-
-    /* ─── Status banners (last solve result, credits) ─── */
-    .banner {
-      display: flex;
-      align-items: flex-start;
-      gap: 8px;
-      margin-bottom: 10px;
-      padding: 8px 10px;
-      border: 1px solid var(--border-strong);
-      border-radius: 6px;
-      background: var(--raised);
-      font-size: 11px;
-      line-height: 1.45;
-      color: var(--text-dim);
-    }
-
-    .banner[hidden] {
-      display: none;
-    }
-
-    .banner.error,
-    .banner.warn {
-      border-color: var(--error);
-    }
-
-    .banner-text {
-      flex: 1;
-      min-width: 0;
-      overflow-wrap: anywhere;
-    }
-
-    .banner-time {
-      display: block;
-      color: var(--text-faint);
-      font-size: 10px;
-    }
-
-    .banner-btn {
-      flex-shrink: 0;
-      background: none;
-      border: none;
-      color: var(--text-faint);
-      cursor: pointer;
-      font-size: 11px;
-      padding: 0 2px;
-    }
-
-    .banner-btn:hover {
-      color: var(--text);
-    }
-
-    /* ─── Models Tab ─── */
-    .model-list {
-      max-height: 380px;
-      overflow-y: auto;
-      margin-bottom: 10px;
-    }
-
-    .model-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 7px 10px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      margin-bottom: 4px;
-      transition: border-color 0.15s;
-    }
-
-    .model-item:hover {
-      border-color: var(--border-strong);
-    }
-
-    .model-info {
-      flex: 1;
-      min-width: 0;
-    }
-
-    .model-name {
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--text);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .model-id {
-      font-size: 10px;
-      color: var(--text-faint);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .badge {
-      font-size: 9px;
-      padding: 2px 7px;
-      border-radius: 4px;
-      background: transparent;
-      color: var(--accent);
-      border: 1px dashed var(--accent);
-      flex-shrink: 0;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .delete-model-btn {
-      background: none;
-      border: none;
-      color: var(--text-faint);
-      cursor: pointer;
-      font-size: 13px;
-      padding: 2px 4px;
-      line-height: 1;
-      transition: color 0.15s;
-      flex-shrink: 0;
-    }
-
-    .delete-model-btn:hover {
-      color: var(--error);
-    }
-
-    .add-model-row {
-      display: flex;
-      gap: 6px;
-      margin-top: 8px;
-    }
-
-    .add-model-row input {
-      flex: 1;
-      min-width: 0;
-    }
-
-    /* ─── Profiles Tab ─── */
-    .profile-selector {
-      display: flex;
-      gap: 6px;
-      margin-bottom: 12px;
-      flex-wrap: wrap;
-    }
-
-    .profile-chip {
-      padding: 5px 12px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      font-size: 11px;
-      cursor: pointer;
-      transition: color 0.15s, border-color 0.15s, background 0.15s;
-      color: var(--text-dim);
-      font-family: inherit;
-    }
-
-    .profile-chip:hover {
-      border-color: var(--border-strong);
-      color: var(--text);
-    }
-
-    .profile-chip.active {
-      background: var(--accent-soft);
-      border: 1px solid var(--accent);
-      color: var(--accent);
-      font-weight: 600;
-    }
-
-    .profile-chip .chip-icon {
-      margin-right: 4px;
-    }
-
-    .profile-actions {
-      display: flex;
-      gap: 6px;
-      margin-bottom: 12px;
-    }
-
-    .assignment-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 10px;
-      margin-bottom: 6px;
-    }
-
-    .assignment-label {
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--text-dim);
-      margin-bottom: 6px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .assignment-label .a-icon {
-      font-size: 13px;
-    }
-
-    .assignment-row {
-      display: flex;
-      gap: 6px;
-    }
-
-    .assignment-row select {
-      padding: 6px 8px;
-      font-size: 11px;
-    }
-
-    .assignment-row .model-select {
-      flex: 2;
-      min-width: 0;
-    }
-
-    .assignment-row .reasoning-select {
-      flex: 1;
-      min-width: 80px;
-    }
-
-    /* ─── Fallback Tab ─── */
-    .fb-intro {
-      margin: 0 0 10px;
-    }
-
-    .fb-list {
-      margin-bottom: 4px;
-    }
-
-    .fb-empty {
-      padding: 14px 10px;
-      text-align: center;
-      font-size: 11px;
-      color: var(--text-faint);
-      border: 1px dashed var(--border-strong);
-      border-radius: 6px;
-      margin-bottom: 4px;
-    }
-
-    .fb-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 8px 6px 4px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      margin-bottom: 4px;
-      transition: border-color 0.15s, opacity 0.15s;
-    }
-
-    .fb-item:hover {
-      border-color: var(--border-strong);
-    }
-
-    .fb-item.dragging {
-      opacity: 0.45;
-      border-style: dashed;
-      border-color: var(--accent);
-    }
-
-    .fb-handle {
-      background: none;
-      border: none;
-      color: var(--text-faint);
-      cursor: grab;
-      font-size: 14px;
-      line-height: 1;
-      padding: 4px 3px;
-      flex-shrink: 0;
-      font-family: inherit;
-    }
-
-    .fb-handle:hover {
-      color: var(--accent);
-    }
-
-    .fb-handle:active {
-      cursor: grabbing;
-    }
-
-    .fb-num {
-      font-size: 10px;
-      font-weight: 700;
-      color: var(--accent);
-      min-width: 14px;
-      text-align: right;
-      flex-shrink: 0;
-    }
-
-    .fb-item .fb-reasoning,
-    .add-model-row .fb-reasoning {
-      width: 82px;
-      flex-shrink: 0;
-      padding: 5px 6px;
-      font-size: 11px;
-    }
-
-    /* ─── New profile form ─── */
-    .new-profile-form {
-      display: none;
-      margin-bottom: 10px;
-      padding: 10px;
-      background: var(--surface);
-      border: 1px dashed var(--border-strong);
-      border-radius: 8px;
-    }
-
-    .new-profile-form.visible {
-      display: block;
-    }
-
-    .new-profile-row {
-      display: flex;
-      gap: 6px;
-      margin-top: 6px;
-    }
-
-    .new-profile-row input {
-      min-width: 0;
-    }
-
-    .icon-input {
-      width: 44px !important;
-      flex-shrink: 0;
-      text-align: center;
-      font-size: 15px !important;
-    }
-
-    /* ─── Modal ─── */
-    .modal-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(10, 10, 12, 0.72);
-      z-index: 1000;
-      justify-content: center;
-      align-items: center;
-    }
-
-    .modal-overlay.visible {
-      display: flex;
-    }
-
-    .modal {
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 20px;
-      width: 340px;
-      max-width: 95%;
-      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
-    }
-
-    .modal h2 {
-      font-size: 13px;
-      color: var(--text);
-      margin-bottom: 14px;
-      padding-bottom: 10px;
-      border-bottom: 1px dashed var(--border);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .modal-actions {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      margin-bottom: 10px;
-    }
-
-    .modal-btn {
-      width: 100%;
-      padding: 9px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      color: var(--text-dim);
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: color 0.15s, border-color 0.15s, background 0.15s;
-      font-family: inherit;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .modal-btn:hover {
-      border-color: var(--accent);
-      color: var(--accent);
-      background: var(--accent-soft);
-    }
-
-    .modal-btn .m-icon {
-      font-size: 15px;
-    }
-
-    .modal-close {
-      margin-top: 2px;
-      width: 100%;
-      padding: 8px;
-      background: transparent;
-      border: 1px dashed var(--border-strong);
-      border-radius: 6px;
-      color: var(--text-faint);
-      font-size: 12px;
-      cursor: pointer;
-      transition: color 0.15s, border-color 0.15s;
-      font-family: inherit;
-    }
-
-    .modal-close:hover {
-      color: var(--text);
-      border-color: var(--text-faint);
-    }
-
-    .modal-version {
-      text-align: center;
-      font-size: 10px;
-      color: var(--text-faint);
-      margin-top: 12px;
-      padding-top: 10px;
-      border-top: 1px dashed var(--border-soft);
-    }
-
-    /* ─── Scrollbar ─── */
-    ::-webkit-scrollbar {
-      width: 6px;
-    }
-
-    ::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    ::-webkit-scrollbar-thumb {
-      background: var(--border-strong);
-      border-radius: 4px;
-    }
-
-    ::-webkit-scrollbar-thumb:hover {
-      background: #4a4a50;
-    }
-
-    /* ─── Focus visibility ─── */
-    button:focus-visible,
-    a:focus-visible {
-      outline: 1px solid var(--accent);
-      outline-offset: 2px;
-    }
-
-    /* hidden file input */
-    #importFileInput {
-      display: none;
-    }
-  </style>
+  <link rel="stylesheet" href="popup.css">
 </head>
 
 <body>
+  <!-- ═══ Icon set + chart hatching ═══ -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <pattern id="hatch" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <line x1="0" y1="0" x2="0" y2="4" stroke="#e3a557" stroke-width="1" stroke-opacity="0.55" />
+      </pattern>
+    </defs>
+    <symbol id="i-home" viewBox="0 0 24 24">
+      <path d="M4 10.5 12 4l8 6.5V19a1.5 1.5 0 0 1-1.5 1.5H15v-5.5H9v5.5H5.5A1.5 1.5 0 0 1 4 19z" />
+    </symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24">
+      <path d="M12 3 3 8l9 5 9-5z" />
+      <path d="m3 12.5 9 5 9-5" />
+      <path d="m3 16.5 9 5 9-5" />
+    </symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24">
+      <path d="M4 6h9M19 6h1M4 12h3M13 12h7M4 18h11M21 18h-1" />
+      <circle cx="16" cy="6" r="2.5" />
+      <circle cx="10" cy="12" r="2.5" />
+      <circle cx="17.5" cy="18" r="2.5" />
+    </symbol>
+    <symbol id="i-chain" viewBox="0 0 24 24">
+      <path d="M10 14a4.2 4.2 0 0 0 6 0l3-3a4.2 4.2 0 0 0-6-6l-1 1" />
+      <path d="M14 10a4.2 4.2 0 0 0-6 0l-3 3a4.2 4.2 0 0 0 6 6l1-1" />
+    </symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24">
+      <path d="M3 20.5h18" />
+      <path d="M6 17v-5M11 17V6M16 17v-8M20.5 17v-3" />
+    </symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="3.2" />
+      <path d="M12 2.5v2.6M12 18.9v2.6M4.6 4.6l1.9 1.9M17.5 17.5l1.9 1.9M2.5 12h2.6M18.9 12h2.6M4.6 19.4l1.9-1.9M17.5 6.5l1.9-1.9" />
+      <circle cx="12" cy="12" r="6.6" />
+    </symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24">
+      <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
+      <circle cx="12" cy="12" r="3" />
+    </symbol>
+    <symbol id="i-eye-off" viewBox="0 0 24 24">
+      <path d="M9.9 5.2A9.6 9.6 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-2.6 3.6M6.4 6.4C3.6 8.2 2 12 2 12s3.6 7 10 7a9.4 9.4 0 0 0 5.6-1.8" />
+      <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18" />
+    </symbol>
+    <symbol id="i-x" viewBox="0 0 24 24">
+      <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />
+    </symbol>
+    <symbol id="i-grip" viewBox="0 0 24 24">
+      <path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01" stroke-width="3.2" />
+    </symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24">
+      <path d="M12 5v14M5 12h14" />
+    </symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24">
+      <path d="M4 7h16M9.5 7V4.5h5V7M6 7l1 13h10l1-13M10 11v5M14 11v5" />
+    </symbol>
+    <symbol id="i-download" viewBox="0 0 24 24">
+      <path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 20h14" />
+    </symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24">
+      <path d="M12 20V9M7.5 13.5 12 9l4.5 4.5M5 4h14" />
+    </symbol>
+    <symbol id="i-radio" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="8" />
+      <circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none" />
+    </symbol>
+    <symbol id="i-checkbox" viewBox="0 0 24 24">
+      <rect x="4" y="4" width="16" height="16" rx="3" />
+      <path d="m8.3 12.2 2.6 2.6 4.8-5.6" />
+    </symbol>
+    <symbol id="i-match" viewBox="0 0 24 24">
+      <circle cx="5" cy="7" r="1.6" />
+      <circle cx="5" cy="17" r="1.6" />
+      <circle cx="19" cy="7" r="1.6" />
+      <circle cx="19" cy="17" r="1.6" />
+      <path d="M6.8 7.6 17.2 16.4M6.8 16.4 17.2 7.6" />
+    </symbol>
+    <symbol id="i-text" viewBox="0 0 24 24">
+      <path d="M5 6.5V5h14v1.5M12 5v14M9 19h6" />
+    </symbol>
+    <symbol id="i-image" viewBox="0 0 24 24">
+      <rect x="3" y="4.5" width="18" height="15" rx="2" />
+      <circle cx="9" cy="10" r="1.7" />
+      <path d="m21 15.5-5-5-9.5 9" />
+    </symbol>
+    <symbol id="i-mixed" viewBox="0 0 24 24">
+      <rect x="3.5" y="3.5" width="7" height="7" rx="1.5" />
+      <circle cx="17" cy="7" r="3.5" />
+      <path d="M7 14l3.5 6h-7z" />
+      <path d="M14 15h7M14 19h5" />
+    </symbol>
+    <symbol id="i-coins" viewBox="0 0 24 24">
+      <ellipse cx="12" cy="6.5" rx="7.5" ry="3" />
+      <path d="M4.5 6.5v5c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-5" />
+      <path d="M4.5 11.5v5c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-5" />
+    </symbol>
+    <symbol id="i-gift" viewBox="0 0 24 24">
+      <rect x="4" y="11" width="16" height="9.5" rx="1.5" />
+      <rect x="3" y="7" width="18" height="4" rx="1" />
+      <path d="M12 7v13.5M12 7C10.5 3.5 6.5 4 7.5 6.5 8 7 12 7 12 7zM12 7c1.5-3.5 5.5-3 4.5-.5-.5.5-4.5.5-4.5.5z" />
+    </symbol>
+  </svg>
 
-  <!-- Header -->
-  <div class="header">
-    <div class="logo">✦</div>
-    <div class="header-text">
-      <h1>AI ELIT Solver</h1>
-      <p>Powered by OpenRouter</p>
-    </div>
-    <div class="header-right">
-      <button class="gear-btn" id="gearBtn" title="Settings" aria-label="Settings">⚙</button>
+  <div class="binder">
+    <!-- ═══ Spine with divider tabs ═══ -->
+    <aside class="rail">
+      <nav class="tabs" role="tablist" aria-label="Sections">
+        <button class="tab-btn active" data-tab="main" role="tab"><span class="tab-no">01</span><span class="tab-label">Home</span></button>
+        <button class="tab-btn" data-tab="models" role="tab"><span class="tab-no">02</span><span class="tab-label">Models</span></button>
+        <button class="tab-btn" data-tab="profiles" role="tab"><span class="tab-no">03</span><span class="tab-label">Profiles</span></button>
+        <button class="tab-btn" data-tab="fallback" role="tab"><span class="tab-no">04</span><span class="tab-label">Chain</span></button>
+        <button class="tab-btn" data-tab="usage" role="tab"><span class="tab-no">05</span><span class="tab-label">Usage</span></button>
+      </nav>
+      <button class="rail-gear" id="gearBtn" title="Settings" aria-label="Settings"><svg class="ic">
+          <use href="#i-gear" />
+        </svg></button>
+    </aside>
+
+    <div class="sheet">
+      <!-- ═══ Form header ═══ -->
+      <header class="form-head">
+        <div class="kicker">Answer sheet · form <span id="formVersion"></span></div>
+        <h1>AI ELIT <span>Solver</span></h1>
+        <div class="hero-sub" id="heroSub"></div>
+        <div class="stamp" id="heroPill"><span id="heroStatus">Ready</span></div>
+      </header>
+
+      <main class="views">
+        <!-- ═══════════ 01 Sheet ═══════════ -->
+        <section class="tab-content active" id="tab-main">
+          <div class="stack">
+            <div class="notice banner" id="creditsBanner" role="status" hidden>
+              <svg class="ic">
+                <use href="#i-gift" />
+              </svg>
+              <div class="grow" id="creditsBannerText"></div>
+              <button class="btn sm ghost" id="creditsRetryBtn" title="Use paid models again now">Retry paid</button>
+            </div>
+
+            <div class="answer-card banner" id="statusBanner" role="status" hidden>
+              <div class="answer-top">
+                <div class="answer-label"><span id="statusBannerTitle">Last answer</span><time id="statusBannerTime"></time></div>
+                <button class="x-btn" id="statusBannerClose" title="Dismiss" aria-label="Dismiss"><svg class="ic">
+                    <use href="#i-x" />
+                  </svg></button>
+              </div>
+              <div class="answer-row" id="statusBannerRow" hidden>
+                <div class="bubbles" id="statusBannerBubbles"></div>
+                <div class="grade" id="statusBannerDigits"></div>
+              </div>
+              <div class="answer-text" id="statusBannerText"></div>
+            </div>
+
+            <div>
+              <div class="section-head"><span class="section-title">OpenRouter key</span><span class="section-meta" id="keyBalance"></span></div>
+              <div class="row">
+                <div class="key-field">
+                  <input type="password" id="apiKey" placeholder="sk-or-v1-…" autocomplete="off" spellcheck="false" aria-label="OpenRouter API key">
+                  <button class="eye-btn" id="toggleKey" title="Show / hide" aria-label="Show or hide key"><svg class="ic">
+                      <use href="#i-eye" />
+                    </svg></button>
+                </div>
+                <button class="btn primary" id="saveBtn">Save</button>
+              </div>
+              <p class="hint" style="margin-top:6px">Get one at <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a></p>
+            </div>
+
+            <div>
+              <div class="section-head"><span class="section-title">Profile</span></div>
+              <div class="profile-pick" id="activeProfile" role="radiogroup" aria-label="Active profile"></div>
+            </div>
+
+            <div>
+              <div class="section-head"><span class="section-title">Behaviour</span></div>
+              <div class="opt-list">
+                <div class="opt">
+                  <span class="opt-no">1</span>
+                  <span class="opt-text">
+                    <label class="opt-title" for="hideButton">Stealth mode</label>
+                    <span class="opt-desc">No button, no notices on the page. Solve with <kbd>\</kbd>, read the answer on the icon.</span>
+                  </span>
+                  <span class="switch"><input type="checkbox" id="hideButton"><span class="track"></span></span>
+                </div>
+                <div class="opt">
+                  <span class="opt-no">2</span>
+                  <span class="opt-text">
+                    <label class="opt-title" for="autoFill">Auto-fill answers</label>
+                    <span class="opt-desc">Off: nothing is filled in — option numbers on the icon, full answer here.</span>
+                  </span>
+                  <span class="switch"><input type="checkbox" id="autoFill"><span class="track"></span></span>
+                </div>
+                <div class="opt sub-toggle" id="autoFillOtherRow">
+                  <span class="opt-no">2a</span>
+                  <span class="opt-text">
+                    <label class="opt-title" for="autoFillOther">…also matching, dropdowns, text</label>
+                    <span class="opt-desc">Off: only radio and checkboxes are filled in.</span>
+                  </span>
+                  <span class="switch"><input type="checkbox" id="autoFillOther"><span class="track"></span></span>
+                </div>
+                <div class="opt">
+                  <span class="opt-no">3</span>
+                  <span class="opt-text">
+                    <label class="opt-title" for="debugMode">Debug log</label>
+                    <span class="opt-desc">Print prompts and responses to the page console.</span>
+                  </span>
+                  <span class="switch"><input type="checkbox" id="debugMode"><span class="track"></span></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══════════ 02 Models ═══════════ -->
+        <section class="tab-content" id="tab-models">
+          <div class="stack">
+            <div>
+              <div class="section-head"><span class="section-title">Model register</span><span class="section-meta" id="modelCount"></span></div>
+              <div class="register" id="modelList"></div>
+            </div>
+            <div>
+              <div class="section-head"><span class="section-title">Add a model</span></div>
+              <div class="add-row">
+                <input type="text" id="newModelId" placeholder="provider/model-name" spellcheck="false" aria-label="Model ID">
+                <input type="text" id="newModelName" placeholder="Name" style="flex:0 0 92px" aria-label="Display name">
+                <button class="btn" id="addModelBtn" aria-label="Add model"><svg class="ic">
+                    <use href="#i-plus" />
+                  </svg></button>
+              </div>
+              <p class="hint" style="margin-top:6px">Any ID from <a href="https://openrouter.ai/models" target="_blank">openrouter.ai/models</a></p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══════════ 03 Profiles ═══════════ -->
+        <section class="tab-content" id="tab-profiles">
+          <div class="stack">
+            <div>
+              <div class="section-head"><span class="section-title">Profiles</span></div>
+              <div class="chips" id="profileSelector"></div>
+              <div class="row" style="margin-top:10px">
+                <button class="btn sm" id="newProfileBtn"><svg class="ic">
+                    <use href="#i-plus" />
+                  </svg>New</button>
+                <span style="flex:1"></span>
+                <button class="btn sm danger" id="deleteProfileBtn"><svg class="ic">
+                    <use href="#i-trash" />
+                  </svg>Delete</button>
+              </div>
+              <div class="new-profile-form" id="newProfileForm" style="margin-top:10px">
+                <div class="add-row">
+                  <input type="text" class="icon-input" id="newProfileIcon" placeholder="✦" maxlength="2" aria-label="Profile icon">
+                  <input type="text" id="newProfileName" placeholder="Profile name" aria-label="Profile name">
+                  <button class="btn primary" id="createProfileBtn">Create</button>
+                </div>
+              </div>
+            </div>
+            <div>
+              <div class="section-head"><span class="section-title">Model per question</span></div>
+              <div class="assignments" id="assignmentsContainer"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══════════ 04 Chain ═══════════ -->
+        <section class="tab-content" id="tab-fallback">
+          <div class="stack">
+            <div>
+              <div class="section-head"><span class="section-title">Order of attempts</span></div>
+              <p class="hint" style="margin-bottom:10px">If a model fails (error, timeout, empty answer) the next one takes over. Drag <b>⠿</b> to reorder.</p>
+              <div class="chain">
+                <div class="node">
+                  <svg class="ic node-icon">
+                    <use href="#i-sliders" />
+                  </svg>
+                  <div>
+                    <div class="node-title">Profile model</div>
+                    <div class="node-sub">set per question in Profiles</div>
+                  </div>
+                </div>
+                <div class="fb-list" id="fallbackList"></div>
+                <div class="node free">
+                                    <svg class="ic node-icon">
+                    <use href="#i-gift" />
+                  </svg>
+                  <div>
+                    <div class="node-title">Free models</div>
+                    <div class="node-sub" id="freeModelsHint"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div>
+              <div class="section-head"><span class="section-title">Add to chain</span></div>
+              <div class="add-row">
+                <input type="text" id="newFallbackModel" list="fallbackModelOptions" placeholder="Pick or type a model ID" spellcheck="false" aria-label="Model ID">
+                <datalist id="fallbackModelOptions"></datalist>
+                <select id="newFallbackReasoning" class="fb-reasoning"></select>
+                <button class="btn" id="addFallbackBtn" aria-label="Add to chain"><svg class="ic">
+                    <use href="#i-plus" />
+                  </svg></button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══════════ 05 Usage ═══════════ -->
+        <section class="tab-content" id="tab-usage">
+          <div class="stack" id="usageView"></div>
+        </section>
+      </main>
+
+      <div class="status" id="status" role="status" aria-live="polite"></div>
     </div>
   </div>
 
-  <!-- Status banners: on-page notifications are off when the button is hidden -->
-  <div class="banner warn" id="creditsBanner" role="status" hidden>
-    <div class="banner-text" id="creditsBannerText"></div>
-    <button class="banner-btn" id="creditsRetryBtn" title="Use paid models again now">Retry paid</button>
-  </div>
-  <div class="banner" id="statusBanner" role="status" hidden>
-    <div class="banner-text">
-      <span id="statusBannerText"></span>
-      <span class="banner-time" id="statusBannerTime"></span>
-    </div>
-    <button class="banner-btn" id="statusBannerClose" title="Dismiss" aria-label="Dismiss">✕</button>
-  </div>
-
-  <!-- Tabs -->
-  <div class="tabs">
-    <button class="tab-btn active" data-tab="main">Main</button>
-    <button class="tab-btn" data-tab="models">Models</button>
-    <button class="tab-btn" data-tab="profiles">Profiles</button>
-    <button class="tab-btn" data-tab="fallback">Fallback</button>
-  </div>
-
-  <!-- ══════════ TAB: Main ══════════ -->
-  <div class="tab-content active" id="tab-main">
-    <div class="field">
-      <label>OpenRouter API Key</label>
-      <div class="toggle-key">
-        <input type="password" id="apiKey" placeholder="sk-or-v1-…" autocomplete="off">
-        <button class="eye-btn" id="toggleKey" title="Show/Hide" aria-label="Show or hide key">👁</button>
-      </div>
-      <p class="hint">
-        Get a free key at <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a>
-      </p>
-    </div>
-
-    <div class="field">
-      <label>Active Profile</label>
-      <select id="activeProfile"></select>
-    </div>
-
-    <button class="save-btn" id="saveBtn">Save Settings</button>
-
-    <div class="toggle-field">
-      <label for="hideButton">Hide "Answer with AI" button</label>
-      <label class="toggle-switch">
-        <input type="checkbox" id="hideButton">
-        <span class="slider"></span>
-      </label>
-    </div>
-    <p class="toggle-hint">Hides the button and all on-page notifications. The <b>\</b> hotkey still works; results show on the extension icon and here.</p>
-
-    <div class="toggle-field">
-      <label for="autoFill">Auto-fill answers</label>
-      <label class="toggle-switch">
-        <input type="checkbox" id="autoFill">
-        <span class="slider"></span>
-      </label>
-    </div>
-    <p class="toggle-hint">Off: nothing is filled in, the answer is only shown (option numbers on the extension icon, full answer here).</p>
-
-    <div class="toggle-field sub-toggle" id="autoFillOtherRow">
-      <label for="autoFillOther">Also fill matching, dropdowns and text fields</label>
-      <label class="toggle-switch">
-        <input type="checkbox" id="autoFillOther">
-        <span class="slider"></span>
-      </label>
-    </div>
-    <p class="toggle-hint sub-toggle">Off: only radio and checkbox answers are filled in; other answers are only shown.</p>
-
-    <div class="toggle-field">
-      <label for="debugMode">Debug mode (log prompts to console)</label>
-      <label class="toggle-switch">
-        <input type="checkbox" id="debugMode">
-        <span class="slider"></span>
-      </label>
-    </div>
-  </div>
-
-  <!-- ══════════ TAB: Models ══════════ -->
-  <div class="tab-content" id="tab-models">
-    <div class="model-list" id="modelList"></div>
-
-    <div class="add-model-row">
-      <input type="text" id="newModelId" placeholder="provider/model-name">
-      <input type="text" id="newModelName" placeholder="Display name">
-      <button class="btn-sm" id="addModelBtn">+ Add</button>
-    </div>
-    <p class="hint" style="margin-top:6px">Enter an OpenRouter model ID and a display name</p>
-  </div>
-
-  <!-- ══════════ TAB: Profiles ══════════ -->
-  <div class="tab-content" id="tab-profiles">
-    <div class="profile-selector" id="profileSelector"></div>
-
-    <div class="profile-actions">
-      <button class="btn-sm" id="newProfileBtn">+ New Profile</button>
-      <button class="btn-sm danger" id="deleteProfileBtn">Delete</button>
-    </div>
-
-    <div class="new-profile-form" id="newProfileForm">
-      <label>Create New Profile</label>
-      <div class="new-profile-row">
-        <input type="text" class="icon-input" id="newProfileIcon" placeholder="⚡" maxlength="2">
-        <input type="text" id="newProfileName" placeholder="Profile name">
-        <button class="btn-sm" id="createProfileBtn">Create</button>
-      </div>
-    </div>
-
-    <div id="assignmentsContainer"></div>
-  </div>
-
-  <!-- ══════════ TAB: Fallback ══════════ -->
-  <div class="tab-content" id="tab-fallback">
-    <p class="hint fb-intro">
-      If the profile's model fails (API error, timeout, empty or invalid response),
-      these models are tried <b>top to bottom</b>. Drag <b>⠿</b> to change the order.
-    </p>
-
-    <div class="fb-list" id="fallbackList"></div>
-
-    <div class="add-model-row">
-      <input type="text" id="newFallbackModel" list="fallbackModelOptions" placeholder="Pick or type model ID">
-      <datalist id="fallbackModelOptions"></datalist>
-      <select id="newFallbackReasoning" class="fb-reasoning"></select>
-      <button class="btn-sm" id="addFallbackBtn">+ Add</button>
-    </div>
-    <p class="hint" style="margin-top:6px">Choose from the model library or enter any OpenRouter model ID</p>
-    <p class="hint" style="margin-top:6px" id="freeModelsHint"></p>
-  </div>
-
-  <!-- Status -->
-  <div class="status" id="status" aria-live="polite"></div>
-
-  <!-- ══════════ Settings Modal ══════════ -->
+  <!-- ═══ Settings slip ═══ -->
   <div class="modal-overlay" id="settingsModal">
-    <div class="modal">
-      <h2>⚙ Settings</h2>
-      <div class="modal-actions">
-        <button class="modal-btn" id="exportBtn">
-          <span class="m-icon">📤</span> Export Config
-        </button>
-        <button class="modal-btn" id="importBtn">
-          <span class="m-icon">📥</span> Import Config
-        </button>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+      <h2 id="settingsTitle">Settings</h2>
+      <p class="hint">Move profiles, models and the key to another browser.</p>
+      <div class="modal-grid">
+        <button class="btn" id="exportBtn"><svg class="ic">
+            <use href="#i-download" />
+          </svg>Export</button>
+        <button class="btn" id="importBtn"><svg class="ic">
+            <use href="#i-upload" />
+          </svg>Import</button>
       </div>
+      <button class="btn danger block" id="resetStatsBtn"><svg class="ic">
+          <use href="#i-trash" />
+        </svg>Reset usage statistics</button>
       <input type="file" id="importFileInput" accept=".json">
-      <button class="modal-close" id="closeModalBtn">Close</button>
-      <p class="modal-version">AI ELIT Solver v1.4.5</p>
+      <div class="modal-foot">
+        <span id="appVersion"></span>
+        <button class="btn sm ghost" id="closeModalBtn">Close</button>
+      </div>
     </div>
   </div>
 

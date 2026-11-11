@@ -14,7 +14,7 @@ const OUT_DIR = path.join(ROOT, 'ai-elit-extension');
 const OUT_ZIP = path.join(ROOT, 'ai-elit-extension.zip');
 
 const MINIFY_JS = ['models.js', 'content.js', 'popup.js', 'background.js'];
-const COPY_AS_IS = ['manifest.json', 'popup.html'];
+const COPY_AS_IS = ['manifest.json', 'popup.html', 'popup.css', ...fs.readdirSync(path.join(ROOT, 'fonts')).map(f => `fonts/${f}`)];
 
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8'));
 
