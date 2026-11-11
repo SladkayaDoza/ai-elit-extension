@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="store.css">
+<style>
+  body { width: 1280px; height: 800px; }
+  .copy { position: absolute; left: 0; right: 0; top: 52px; text-align: center; display: grid; gap: 14px; justify-items: center; }
+  .copy .headline { font-size: 36px; }
+  .copy .lead { max-width: 900px; font-size: 16px; }
+  .row { position: absolute; left: 0; right: 0; top: 232px; display: flex; justify-content: center; gap: 40px; }
+  .col { width: 360px; }
+  .frame { width: 360px; height: 540px; overflow: hidden; }
+  .frame img { width: 360px; }
+</style>
+</head>
+<body>
+  <div class="copy">
+    <div class="eyebrow">Your models, your rules</div>
+    <h1 class="headline">A model for every question type, <em>with automatic fallbacks</em></h1>
+    <p class="lead">Fable 5.2, Opus 5.5, Sonnet 5.5, GPT-6.1 Sol, Gemini 3.8 Flash or any OpenRouter model. If one fails, the next takes over; out of credits, free models step in.</p>
+  </div>
+  <div class="row">
+    <div class="col"><div class="popup-label">Profiles</div><div class="frame popup"><img src=".build/popup-profiles.png" alt=""></div></div>
+    <div class="col"><div class="popup-label">Fallback</div><div class="frame popup"><img src=".build/popup-fallback.png" alt=""></div></div>
+    <div class="col"><div class="popup-label">Settings</div><div class="frame popup"><img src=".build/popup-main.png" alt=""></div></div>
+  </div>
+</body>
+</html>

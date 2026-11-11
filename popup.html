@@ -301,13 +301,27 @@
       line-height: 1.4;
     }
 
-    /* Sub-switch: indented under its parent, greyed out while the parent is off */
+    /* Sub-switch: indented under its parent with a └ connector, greyed out while the parent is off */
     .sub-toggle {
-      margin-left: 18px;
+      margin-left: 20px;
     }
 
     .toggle-field.sub-toggle {
+      position: relative;
       margin-top: 0;
+    }
+
+    .toggle-field.sub-toggle::before {
+      content: '';
+      position: absolute;
+      left: -13px;
+      top: -10px;
+      width: 12px;
+      height: calc(50% + 10px);
+      border-left: 2px solid var(--border-strong);
+      border-bottom: 2px solid var(--border-strong);
+      border-bottom-left-radius: 6px;
+      pointer-events: none;
     }
 
     .sub-toggle.disabled {
