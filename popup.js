@@ -668,7 +668,9 @@ function tile(label, value, sub, hero = false) {
 }
 
 function dailyChart(days) {
-  const N = 14, W = 288, H = 112, top = 10, bottom = 18, gap = 5;
+  // The plot leaves a gutter on the right for the axis label, so bars never cover it
+  const N = 14, W = 288, gutter = 34, H = 112, top = 10, bottom = 18, gap = 5;
+  const plotW = W - gutter;
   const series = [];
   for (let i = N - 1; i >= 0; i--) {
     const t = Date.now() - i * 864e5;
@@ -676,7 +678,7 @@ function dailyChart(days) {
     series.push({ t, cost: d.cost || 0, requests: d.requests || 0, questions: d.questions || 0 });
   }
   const max = Math.max(...series.map(s => s.cost), 0) || 1;
-  const bw = (W - gap * (N - 1)) / N;
+  const bw = (plotW - gap * (N - 1)) / N;
   const plotH = H - top - bottom;
 
   const svg = document.createElementNS(SVG_NS, 'svg');
@@ -691,8 +693,9 @@ function dailyChart(days) {
   };
 
   // Recessive grid: baseline + half line
-  svg.append(mk('line', { class: 'grid', x1: 0, x2: W, y1: top + plotH + 0.5, y2: top + plotH + 0.5 }));
-  svg.append(mk('line', { class: 'grid', x1: 0, x2: W, y1: top + plotH / 2, y2: top + plotH / 2, 'stroke-dasharray': '2 4' }));
+  svg.append(mk('line', { class: 'grid', x1: 0, x2: plotW, y1: top + plotH + 0.5, y2: top + plotH + 0.5 }));
+  svg.append(mk('line', { class: 'grid', x1: 0, x2: plotW + 4, y1: top + plotH / 2, y2: top + plotH / 2, 'stroke-dasharray': '2 4' }));
+  svg.append(mk('line', { class: 'grid', x1: 0, x2: plotW + 4, y1: top, y2: top, 'stroke-dasharray': '2 4' }));
 
   const wrap = el('div', { class: 'chart-wrap' });
   const tip = el('div', { class: 'chart-tip' });
@@ -724,9 +727,12 @@ function dailyChart(days) {
     svg.append(g);
   });
 
-  const midLabel = mk('text', { class: 'axis', x: W, y: top + plotH / 2 - 4, 'text-anchor': 'end' });
-  midLabel.textContent = money(max / 2);
-  svg.append(midLabel);
+  // Axis labels in the gutter: the top line is the busiest day, the dashed middle is half of it
+  [[top, max], [top + plotH / 2, max / 2]].forEach(([y, v]) => {
+    const lbl = mk('text', { class: 'axis', x: W, y: y + 3, 'text-anchor': 'end' });
+    lbl.textContent = money(v);
+    svg.append(lbl);
+  });
   wrap.append(svg, tip);
   return wrap;
 }

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="store.css">
+<style>
+  body { width: 1280px; height: 800px; }
+  .copy { position: absolute; left: 64px; top: 0; bottom: 0; width: 470px; display: flex; flex-direction: column; justify-content: center; gap: 22px; }
+  .shot {
+    position: absolute; right: 120px; top: 48px; width: 360px; height: 752px; overflow: hidden;
+    border-radius: 10px 10px 0 0; border: 1px solid #34343a; border-bottom: none;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+  }
+  .shot img { width: 360px; display: block; }
+  .stats { display: flex; gap: 28px; margin-top: 4px; }
+  .stat b { display: block; font: 600 30px/1 var(--mono); color: var(--text); letter-spacing: -0.02em; }
+  .stat b.hi { color: var(--accent); }
+  .stat span { display: block; margin-top: 8px; font: 500 12px var(--label); letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-faint); }
+</style>
+</head>
+<body>
+  <div class="copy">
+    <div class="eyebrow">Usage</div>
+    <h1 class="headline">Know what every answer <em>costs</em></h1>
+    <p class="lead">Tokens and cost of every request come straight from OpenRouter and are tallied on your device, day by day and model by model.</p>
+    <div class="stats">
+      <div class="stat"><b class="hi">$0.02</b><span>per question</span></div>
+      <div class="stat"><b>14 days</b><span>spend chart</span></div>
+      <div class="stat"><b>$5.17</b><span>balance</span></div>
+    </div>
+    <ul class="points">
+      <li>Today, last 30 days and all time</li>
+      <li>Input, output and thinking tokens</li>
+      <li>Spend per model and recent requests</li>
+      <li>Stored only in your browser, reset any time</li>
+    </ul>
+  </div>
+  <div class="shot"><img src=".build/popup-usageTall.png" alt=""></div>
+</body>
+</html>

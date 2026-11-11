@@ -33,7 +33,7 @@ const PROFILE_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'aqs-store-'));
 
 function screenshot(htmlFile, outFile, width, height, scale = 1) {
   execFileSync(BROWSER, [
-    '--headless=new', '--disable-gpu', '--hide-scrollbars', '--no-first-run',
+    '--headless=new', '--lang=en-US', '--disable-gpu', '--hide-scrollbars', '--no-first-run',
     '--no-default-browser-check', '--allow-file-access-from-files',
     `--user-data-dir=${PROFILE_DIR}`,
     `--force-device-scale-factor=${scale}`,
@@ -58,6 +58,8 @@ const POPUPS = {
   fallback: { tab: 'fallback', data: base },
   models: { tab: 'models', data: base },
   usage: { tab: 'usage', data: { ...base, usageStats: demoStats() } },
+  // Taller than the real popup so the whole Usage tab fits on one store image
+  usageTall: { tab: 'usage', height: 960, data: { ...base, usageStats: demoStats() } },
 };
 
 // Plausible two weeks of usage for the Usage tab screenshot
@@ -102,10 +104,13 @@ for (const [name, cfg] of Object.entries(POPUPS)) {
   const data = { ...cfg.data };
   if (data.lastStatus) data.lastStatus = { ...data.lastStatus, time: Date.now() };
   // No transitions: the screenshot must show the final tab highlight, not a mid-animation frame
-  const mock = `<style>*,*::before,*::after{transition:none!important}</style>
+  const height = cfg.height || 584;
+  const mock = `<style>*,*::before,*::after{transition:none!important}${cfg.height ? `body{height:${height}px!important}` : ''}</style>
 <script>
 const DATA = ${JSON.stringify(data)};
 const copy = o => JSON.parse(JSON.stringify(o));
+// OpenRouter balance for the key (popup asks /api/v1/credits)
+window.fetch = async () => ({ ok: true, json: async () => ({ data: { total_credits: 10, total_usage: 4.83 } }) });
 window.chrome = {
   runtime: { lastError: null, sendMessage() {}, getManifest: () => ({ version: "1.5.0" }) },
   storage: {
@@ -136,7 +141,7 @@ setTimeout(() => {
     .replace('<script src="popup.js"></script>', `<script src="${rel}/popup.js"></script>\n${after}`);
   const file = path.join(BUILD, `popup-${name}.html`);
   fs.writeFileSync(file, html);
-  screenshot(file, path.join(BUILD, `popup-${name}.png`), 400, 584, 2);
+  screenshot(file, path.join(BUILD, `popup-${name}.png`), 400, height, 2);
   console.log(`  popup     ${name}`);
 }
 
@@ -149,6 +154,7 @@ const IMAGES = [
   ['screenshot-3-settings.html', 'screenshot-3-settings-1280x800.png', 1280, 800],
   ['promo-small.html', 'promo-small-440x280.png', 440, 280],
   ['promo-marquee.html', 'promo-marquee-1400x560.png', 1400, 560],
+  ['screenshot-4-usage.html', 'screenshot-4-usage-1280x800.png', 1280, 800],
 ];
 
 for (const [src, out, w, h] of IMAGES) {

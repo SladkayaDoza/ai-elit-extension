@@ -1034,6 +1034,48 @@ function answerBadge(indices) {
   return text.length <= 4 ? text : text.slice(0, 3) + '+';
 }
 
+// Toast icons, drawn in the popup's line style (24×24 grid, 2px stroke on a soft disc)
+const TOAST_ICONS = {
+  check: { color: '#e3a557', d: 'M7.5 12.5l3 3 6-6.5' },
+  answer: { color: '#e3a557', d: 'M12 6.5c.3 2.6 1.6 4 4.5 4.5-2.9.5-4.2 1.9-4.5 4.5-.3-2.6-1.6-4-4.5-4.5 2.9-.5 4.2-1.9 4.5-4.5z' },
+  cross: { color: '#e8705f', d: 'M8.5 8.5l7 7M15.5 8.5l-7 7' },
+  alert: { color: '#e8705f', d: 'M12 7.5v5.5M12 16.4v.1' },
+  next: { color: '#aaa69e', d: 'M7.5 8v2.5a3 3 0 0 0 3 3h6M14 11l2.5 2.5L14 16' },
+  retry: { color: '#aaa69e', d: 'M16.5 11.5a4.5 4.5 0 1 0-1.3 3.4M16.5 8v3.5H13' },
+  wait: { color: '#aaa69e', d: 'M12 8v4l2.5 1.5' },
+  dots: { color: '#aaa69e', d: 'M8.5 12h.01M12 12h.01M15.5 12h.01' },
+};
+
+const TOAST_ICON_BY_EMOJI = {
+  '✅': 'check', '💡': 'answer', '❌': 'cross', '⚠': 'alert', '⚠️': 'alert', '↪': 'next', '⟳': 'retry', '⏳': 'wait',
+};
+
+function toastIcon(kind) {
+  const { color, d } = TOAST_ICONS[kind] || TOAST_ICONS.dots;
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('width', '20');
+  svg.setAttribute('height', '20');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.style.cssText = 'flex-shrink:0;display:block;margin-top:-1px';
+  const disc = document.createElementNS(NS, 'circle');
+  disc.setAttribute('cx', '12'); disc.setAttribute('cy', '12'); disc.setAttribute('r', '11');
+  disc.setAttribute('fill', color); disc.setAttribute('fill-opacity', '0.14');
+  const ring = document.createElementNS(NS, 'circle');
+  ring.setAttribute('cx', '12'); ring.setAttribute('cy', '12'); ring.setAttribute('r', '10.25');
+  ring.setAttribute('fill', 'none'); ring.setAttribute('stroke', color); ring.setAttribute('stroke-opacity', '0.45'); ring.setAttribute('stroke-width', '1');
+  const glyph = document.createElementNS(NS, 'path');
+  glyph.setAttribute('d', d);
+  glyph.setAttribute('fill', kind === 'answer' ? color : 'none');
+  glyph.setAttribute('stroke', color);
+  glyph.setAttribute('stroke-width', kind === 'answer' ? '1' : '2');
+  glyph.setAttribute('stroke-linecap', 'round');
+  glyph.setAttribute('stroke-linejoin', 'round');
+  svg.append(disc, ring, glyph);
+  return svg;
+}
+
 async function showToast(message, type = 'info', badge = '') {
   reportStatus(type, message, badge);
   try {
@@ -1045,21 +1087,31 @@ async function showToast(message, type = 'info', badge = '') {
     const existing = document.getElementById('aqs-toast');
     if (existing) existing.remove();
 
-    // Same look as the popup: flat dark panel, hairline border, colored stripe on the left
-    const stripe = { info: '#74716a', success: '#e3a557', error: '#e8705f' }[type] || '#74716a';
+    // Messages start with an emoji (also used by the badge tooltip); on the page it is
+    // swapped for a drawn icon so the toast matches the popup instead of the OS emoji set
+    const m = /^(\p{Extended_Pictographic}|[↪⟳])️?\s*/u.exec(message);
+    const lead = m ? m[1] : '';
+    const text = m ? message.slice(m[0].length) : message;
+    const kind = TOAST_ICON_BY_EMOJI[lead] || (type === 'success' ? 'check' : type === 'error' ? 'alert' : 'dots');
+    const color = TOAST_ICONS[kind].color;
 
     const toast = document.createElement('div');
     toast.id = 'aqs-toast';
-    toast.textContent = message;
+    const label = document.createElement('span');
+    label.textContent = text;
+    toast.append(toastIcon(kind), label);
     Object.assign(toast.style, {
+      display: 'flex',
+      alignItems: 'flex-start',
+      gap: '10px',
       position: 'fixed',
       bottom: '24px',
       right: '24px',
       zIndex: '999999',
-      padding: '10px 14px',
+      padding: '10px 14px 10px 11px',
       borderRadius: '4px',
       border: '1px solid #36363d',
-      borderLeft: `3px solid ${stripe}`,
+      borderLeft: `3px solid ${color}`,
       background: '#19191c',
       color: '#ebe9e4',
       fontSize: '12.5px',
